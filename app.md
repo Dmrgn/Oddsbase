@@ -1,5 +1,3 @@
 # Prediction Market Dashboard
 
 ## Purpose
-
- 
