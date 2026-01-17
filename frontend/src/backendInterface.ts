@@ -4,6 +4,8 @@
  * Abstracts both REST and Real-time communication.
  */
 
+import type { Article } from "@/lib/types/news";
+
 const API_BASE_URL = import.meta.env?.VITE_API_BASE_URL ?? "http://localhost:8000";
 const WS_BASE_URL = API_BASE_URL.replace(/^http/, "ws").replace(/\/$/, "") + "/ws";
 
@@ -25,6 +27,16 @@ type Market = {
   status: string;
   image_url?: string | null;
 };
+
+type MarketSearchResponse = {
+  markets: Market,
+  facets: {
+    sectors: Record<string, number>,
+    sources: {polymarket: 0, kalshi: 0},
+    tags: Record<string, number>
+  },
+  total: number
+}
 
 type QuotePoint = {
   ts: number;
@@ -80,36 +92,19 @@ type MarketDataResponse = {
   points: MarketPoint[];
 };
 
-type NewsItem = {
-  id: string;
-  title: string;
-  source: string;
-  sentiment: "positive" | "neutral" | "negative";
-  publishedAt: string;
-  url: string;
+type NewsSearchParams = {
+  query: string;
+  providers?: string[];
+  limit?: number;
+  signal?: AbortSignal;
 };
 
-type NewsResponse = {
-  query: string;
-  items: NewsItem[];
+type NewsStreamPayload = {
+  provider?: string;
+  articles: Article[];
 };
 
 const randomBetween = (min: number, max: number) => min + Math.random() * (max - min);
-
-const buildMockNews = (query: string): NewsItem[] => {
-  const sentiments: NewsItem["sentiment"][] = ["positive", "neutral", "negative"];
-  return Array.from({ length: 6 }, (_, index) => {
-    const sources = ["Polymarket", "Kalshi", "Forecast Desk"] as const;
-    return {
-      id: `${query}-${index}`,
-      title: `Insight ${index + 1}: ${query} market update`,
-      source: sources[index % sources.length] ?? "Market Desk",
-      sentiment: sentiments[index % sentiments.length] ?? "neutral",
-      publishedAt: new Date(Date.now() - index * 60 * 60 * 1000).toISOString(),
-      url: "https://example.com/market-news",
-    };
-  });
-};
 
 const toMarketPoint = (point: QuotePoint): MarketPoint => ({
   timestamp: new Date(point.ts * 1000).toISOString(),
@@ -234,8 +229,8 @@ const buildUrl = (path: string, params?: Record<string, string | undefined>) => 
 
 export const backendInterface = {
   // REST Interface
-  fetchMarkets: async (query?: string, source?: "polymarket" | "kalshi"): Promise<Market[]> =>
-    fetchJson<Market[]>(buildUrl("/markets", { q: query, source })),
+  fetchMarkets: async (query?: string, source?: "polymarket" | "kalshi"): Promise<MarketSearchResponse> =>
+    fetchJson<MarketSearchResponse>(buildUrl("/markets/search", { q: query, source })),
 
   fetchMarket: async (id: string): Promise<Market> => {
     if (!id) throw new Error("Market ID is required");
@@ -269,11 +264,87 @@ export const backendInterface = {
     };
   },
 
-  fetchNews: async (query: string): Promise<NewsResponse> => {
-    const safeQuery = query || "prediction markets";
-    return {
-      query: safeQuery,
-      items: buildMockNews(safeQuery),
+  fetchNews: async (params: NewsSearchParams): Promise<Article[]> => {
+    const safeQuery = params.query?.trim();
+    if (!safeQuery) return [];
+
+    const searchParams = new URLSearchParams();
+    searchParams.append("q", safeQuery);
+
+    if (params.providers) {
+      params.providers.forEach((provider) => {
+        searchParams.append("providers", provider);
+      });
+    }
+
+    if (params.limit !== undefined) {
+      searchParams.append("limit", String(params.limit));
+    }
+
+    const url = `${API_BASE_URL.replace(/\/$/, "")}/news/search?${searchParams.toString()}`;
+    return fetchJson<Article[]>(url, { signal: params.signal });
+  },
+
+  streamNews: (
+    params: Omit<NewsSearchParams, "signal"> & {
+      onUpdate: (payload: NewsStreamPayload) => void;
+      onDone?: (payload: NewsStreamPayload) => void;
+      onError?: (error: Error) => void;
+    }
+  ): (() => void) => {
+    const safeQuery = params.query?.trim();
+    if (!safeQuery) {
+      return () => undefined;
+    }
+
+    const searchParams = new URLSearchParams();
+    searchParams.append("q", safeQuery);
+    searchParams.append("stream", "true");
+
+    if (params.providers) {
+      params.providers.forEach((provider) => {
+        searchParams.append("providers", provider);
+      });
+    }
+
+    if (params.limit !== undefined) {
+      searchParams.append("limit", String(params.limit));
+    }
+
+    const url = `${API_BASE_URL.replace(/\/$/, "")}/news/search?${searchParams.toString()}`;
+    const source = new EventSource(url);
+
+    const handleUpdate = (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as NewsStreamPayload;
+        params.onUpdate(payload);
+      } catch (error) {
+        params.onError?.(error as Error);
+      }
+    };
+
+    const handleDone = (event: MessageEvent<string>) => {
+      try {
+        const payload = JSON.parse(event.data) as NewsStreamPayload;
+        params.onDone?.(payload);
+      } catch (error) {
+        params.onError?.(error as Error);
+      } finally {
+        source.close();
+      }
+    };
+
+    source.addEventListener("update", handleUpdate);
+    source.addEventListener("done", handleDone);
+    source.onerror = () => {
+      params.onError?.(new Error("News stream error"));
+      source.close();
+    };
+
+    return () => {
+      source.removeEventListener("update", handleUpdate);
+      source.removeEventListener("done", handleDone);
+      source.close();
     };
   },
 
@@ -289,8 +360,8 @@ export type {
   Market,
   MarketDataResponse,
   MarketPoint,
-  NewsItem,
-  NewsResponse,
+  NewsSearchParams,
+  NewsStreamPayload,
   OrderBook,
   OrderBookLevel,
   Outcome,

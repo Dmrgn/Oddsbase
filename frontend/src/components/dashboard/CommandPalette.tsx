@@ -183,7 +183,7 @@ export function CommandPalette() {
         .fetchMarkets(query)
         .then((markets) => {
           if (!active) return;
-          const options = markets.map((market) => ({
+          const options = markets.markets.map((market) => ({
             value: market.market_id,
             label: market.title,
             description: `${market.source} • ${market.market_id.slice(0, 8)}…`,
@@ -324,7 +324,13 @@ export function CommandPalette() {
 
     if (event.key === "Escape") {
       event.preventDefault();
-      closeSubPalette();
+      setSubPalette((prev) => ({ ...prev, open: false }));
+      if (subPalette.paramIndex > 0) {
+        setFocusMode("param");
+        setActiveParamIndex(subPalette.paramIndex - 1);
+      } else {
+        setFocusMode("list");
+      }
       return;
     }
 
