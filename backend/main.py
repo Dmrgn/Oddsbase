@@ -9,9 +9,7 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from news.fetcher import news_fetcher, Article
-# Providers will be registered elsewhere at startup
-# Example:
-#       news_fetcher.register_provider("FMP", fetch_newsapi)
+from news.rank import rank_articles
 
 app = FastAPI()
 
@@ -45,17 +43,25 @@ def search_news(
     Called when the user presses Enter in the search bar.
     Expected Request shape:
     GET /news/search?q=inflation&providers=newsapi&providers=gnews&limit=25
+    
+    Returns ranked, deduplicated articles from all providers.
     """
     
+    # Fetch from all providers in parallel
     if providers:
-        return news_fetcher.fetch_multiple(
+        raw_articles = news_fetcher.fetch_multiple(
             providers=providers,
             query=q,
             limit=limit,
         )
-
-    return news_fetcher.fetch_multiple(
-        providers=news_fetcher.available_providers(),
-        query=q,
-        limit=limit,
-    )
+    else:
+        raw_articles = news_fetcher.fetch_multiple(
+            providers=news_fetcher.available_providers(),
+            query=q,
+            limit=limit,
+        )
+    
+    # Rank, dedupe, and limit results
+    ranked = rank_articles(raw_articles, dedupe=True, limit=limit)
+    
+    return ranked

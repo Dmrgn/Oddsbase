@@ -46,11 +46,15 @@ uv sync
 
 Run development server:
 
+(Make sure you navigate to the `backend/` directory first)
+
 ```bash
 uv run fastapi dev main.py
 ```
 
 Frontend:
+
+(Make sure you navigate to the `frontend/` directory first)
 
 To install dependencies:
 

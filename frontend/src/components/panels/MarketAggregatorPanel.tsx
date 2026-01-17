@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { backendInterface, type MarketPoint } from "@/backendInterface";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCompactNumber, formatCurrency, formatTimestamp } from "@/lib/utils";
 import type { PanelInstance } from "@/hooks/useWorkspaceStore";
 
@@ -48,11 +47,11 @@ export function MarketAggregatorPanel({ panel }: MarketAggregatorPanelProps) {
   }, [points]);
 
   return (
-    <Card className="flex h-full flex-col">
-      <CardHeader className="shrink-0">
-        <CardTitle>{String(panel.data.title ?? "Market Aggregator")}</CardTitle>
-      </CardHeader>
-      <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+    <div className="flex h-full flex-col">
+      <div className="panel-drag-handle shrink-0 cursor-move border-b border-border p-4">
+        <h3 className="font-semibold">Market Aggregator</h3>
+      </div>
+      <div className="panel-content min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <div className="text-sm text-muted-foreground">Market ID: {marketId}</div>
         {error && <div className="text-sm text-destructive">{error}</div>}
         {!error && points.length === 0 && (
@@ -80,7 +79,7 @@ export function MarketAggregatorPanel({ panel }: MarketAggregatorPanelProps) {
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

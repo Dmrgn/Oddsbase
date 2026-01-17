@@ -1,11 +1,19 @@
 
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load .env before importing providers so API keys are available
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
+
 from typing import List, Dict, Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .exa import fetch_exa
 from .nd import fetch_newsdata
-from .fmp import fetch_fmp
-from .lc import fetch_lunarcrush
-
+# from .fmp import fetch_fmp
+from .gd import fetch_gdelt2
+# from .lc import fetch_lunarcrush
+from .cpanic import fetch_cryptopanic
 
 # Article type alias
 Article = Dict[str, object]
@@ -65,25 +73,41 @@ class NewsFetcher:
         **kwargs,
     ) -> List[Article]:
         """
-        Fetch news from multiple providers and aggregate results.
+        Fetch news from multiple providers in parallel and aggregate results.
+        Uses ThreadPoolExecutor to call all APIs concurrently.
         """
         articles: List[Article] = []
+        valid_providers = [p for p in providers if p in self._providers]
+        
+        if not valid_providers:
+            return []
 
-        for provider in providers:
-            if provider not in self._providers:
-                continue
-
+        def fetch_from_provider(provider: str) -> List[Article]:
             try:
-                articles.extend(
-                    self._providers[provider](
-                        query=query,
-                        limit=limit,
-                        **kwargs,
-                    )
+                return self._providers[provider](
+                    query=query,
+                    limit=limit,
+                    **kwargs,
                 )
-            except Exception:
-                # Silently skip failed providers per spec
-                continue
+            except Exception as e:
+                print(f"[NewsFetcher] Error with {provider}: {e}")
+                return []
+
+        # Fetch all providers in parallel
+        with ThreadPoolExecutor(max_workers=len(valid_providers)) as executor:
+            future_to_provider = {
+                executor.submit(fetch_from_provider, provider): provider
+                for provider in valid_providers
+            }
+            
+            for future in as_completed(future_to_provider):
+                provider = future_to_provider[future]
+                try:
+                    result = future.result()
+                    print(f"[NewsFetcher] {provider} returned {len(result)} articles")
+                    articles.extend(result)
+                except Exception as e:
+                    print(f"[NewsFetcher] {provider} failed: {e}")
 
         return articles
 
@@ -92,5 +116,44 @@ news_fetcher = NewsFetcher()
 
 news_fetcher.register_provider("exa", fetch_exa)
 news_fetcher.register_provider("newsdata", fetch_newsdata)
-news_fetcher.register_provider("fmp", fetch_fmp)
-news_fetcher.register_provider("lunarcrush", fetch_lunarcrush)
+news_fetcher.register_provider("gdet", fetch_gdelt2)
+news_fetcher.register_provider("cpanic", fetch_cryptopanic)
+
+if __name__ == "__main__":
+
+
+    print("Testing APIs")
+    print("-------------")
+
+    query = "BTC"
+
+    for provider in news_fetcher.available_providers():
+        print("┌────────────────────────┐")
+        print(f"Trying {provider}...")
+        try:
+            results = news_fetcher.fetch(
+                provider=provider,
+                query=query,
+                limit=5,
+            )
+        except Exception as e:
+            print(f"  ERROR: {e}")
+            print("└────────────────────────┘\n")
+            continue
+
+        if not results:
+            print(f"[{provider}] no results")
+            print("└────────────────────────┘\n")
+            continue
+
+        article = results[0]
+        title = article.get("title")
+        url = article.get("url")
+
+        print(f"[{provider}] {title}")
+        print(f"    {url}")
+        print("└────────────────────────┘\n")
+
+    print("Tested APIS")
+    print("-------------")
+

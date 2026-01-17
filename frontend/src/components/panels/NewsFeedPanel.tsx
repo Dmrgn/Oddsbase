@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import type { PanelInstance } from "@/hooks/useWorkspaceStore";
 import { useNewsSearch } from "@/hooks/useNewsSearch";
 
@@ -14,28 +13,27 @@ export function NewsFeedPanel({ panel }: NewsFeedPanelProps) {
   const [submittedQuery, setSubmittedQuery] = useState(defaultQuery);
   const state = useNewsSearch(submittedQuery);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const queryToSearch = inputValue.trim() || defaultQuery;
-      setSubmittedQuery(queryToSearch);
-    }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const queryToSearch = inputValue.trim() || defaultQuery;
+    setSubmittedQuery(queryToSearch);
   };
 
   return (
     <Card className="flex h-full flex-col">
-      <CardHeader className="shrink-0">
+      <CardHeader className="shrink-0 panel-drag-handle cursor-move">
         <CardTitle>{String(panel.data.title ?? "News Feed")}</CardTitle>
       </CardHeader>
-      <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-        <Input
-          type="text"
-          placeholder="prediction markets"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="w-full"
-        />
+      <CardContent className="panel-content min-h-0 flex-1 space-y-4 overflow-y-auto">
+        <form onSubmit={handleSubmit}>
+          <input
+            type="text"
+            placeholder="Search news..."
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </form>
 
         {state.status === "loading" && (
           <div className="text-sm text-muted-foreground">Loading news…</div>

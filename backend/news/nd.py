@@ -7,21 +7,21 @@ import os
 import requests
 from typing import List, Dict
 
-NDIO_KEY = os.getenv("NDIO")
 
 def fetch_newsdata(query: str, limit: int = 20, **kwargs) -> List[Dict]:
     """
     Uses the /latest endpoint of newsdata.io to fetch articles by keyword.
     """
-    if not NDIO_KEY:
+    ndio_key = os.getenv("NDIO")
+    if not ndio_key:
         return []
 
     url = "https://newsdata.io/api/1/latest"
     params = {
-        "apikey": NDIO_KEY,
+        "apikey": ndio_key,
         "q": query,
         "language": "en",
-        "page_size": limit,
+        "size": limit,
         **kwargs,
     }
 

@@ -35,6 +35,7 @@ export function DashboardGrid() {
         rowHeight={60}
         margin={[16, 16]}
         draggableHandle=".panel-drag-handle"
+        draggableCancel=".panel-content"
         onLayoutChange={(currentLayout: Layout[]) => {
           currentLayout.forEach((item: Layout) => {
             updateLayout(item.i, { x: item.x, y: item.y, w: item.w, h: item.h });
@@ -45,9 +46,7 @@ export function DashboardGrid() {
           .filter((panel: PanelInstance) => panel.isVisible)
           .map((panel: PanelInstance) => (
             <div key={panel.id} data-grid={{ x: panel.x, y: panel.y, w: panel.w, h: panel.h }}>
-              <div className="panel-drag-handle h-full">
-                <PanelRegistry panel={panel} />
-              </div>
+              <PanelRegistry panel={panel} />
             </div>
           ))}
       </ResponsiveGridLayout>

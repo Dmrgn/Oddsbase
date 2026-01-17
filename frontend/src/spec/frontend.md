@@ -113,6 +113,6 @@ Manages the "Workspace" state.
 
 ## 7. Implementation Constraints
 - **Self-Containment:** A panel must never reach into another panel's state.
-- **Interface Only:** Panels use `backendInterface.ts` for data, never the `Command Layer`.
-- **Agent Authority:** The AI Agent is the only entity (besides the user) authorized to invoke the Command Layer.
+- **Interface Only:** Panels use `backendInterface.ts` for data and may invoke the Command Layer for contextual actions like editing.
+- **Command Access:** Panels are allowed to trigger the Command Layer for management actions (e.g. open the Command Palette with defaults).
 - **Formatting:** All mathematical data (odds, percentages) must be typeset correctly using the dashboard's utility layer before rendering.

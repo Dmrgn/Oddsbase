@@ -11,23 +11,17 @@ import os
 import requests
 from typing import List, Dict
 
-EXA_KEY = os.getenv("EXA")
-
 def fetch_exa(query: str, limit: int = 20, **kwargs) -> List[Dict]:
-    """
-    Query the EXA search API to find relevant pages by keyword.
-    EXA's API returns a list of search results. Query params like
-    num_results control count. For deeper content extraction use
-    other EXA endpoints (contents or search_and_contents).
-    """
-    if not EXA_KEY:
+    api_key = os.getenv("EXA")
+    if not api_key:
         return []
 
     url = "https://api.exa.ai/search"
-    headers = {"x-api-key": EXA_KEY}
+    headers = {"x-api-key": api_key}
     payload = {
         "query": query,
-        "num_results": limit,
+        "numResults": limit,
+        "text": True,
         **kwargs,
     }
 
@@ -35,15 +29,14 @@ def fetch_exa(query: str, limit: int = 20, **kwargs) -> List[Dict]:
     resp.raise_for_status()
     data = resp.json()
 
-    articles = []
-    for item in data.get("results", []):
-        articles.append({
+    return [
+        {
             "source": "exa",
             "title": item.get("title") or item.get("link", ""),
             "description": item.get("snippet"),
             "url": item.get("link"),
             "published_at": item.get("published_at"),
             "raw": item,
-        })
-
-    return articles
+        }
+        for item in data.get("results", [])
+    ]
