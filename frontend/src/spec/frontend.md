@@ -108,8 +108,10 @@ Manages the "Workspace" state.
 - **CSS:** Tailwind CSS v4 using the new `@theme` engine for highly performant styling.
 - **Components:**
   - **Grid:** `react-grid-layout` for the drag/resize functionality.
-  - **Command Palette:** Built with `cmdk` (via Shadcn `Command`).
-  - **Agent UI:** A small, persistent chat overlay or a dedicated mode within the Command Palette to view the AI's "thought" chain.
+- **Command Palette:** Built with `cmdk` (via Shadcn `Command`), it can execute agent commands and log activity.
+- **Agent UI:** The agent activity feed is shared between the command palette and the right sidebar.
+- **Sidebar:** Starts collapsed by default and automatically opens after running agent commands.
+- **Market Aggregator Panel:** Provides a copy-to-clipboard button for the market ID.
 
 ---
 

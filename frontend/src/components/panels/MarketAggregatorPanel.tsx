@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts";
+import { Copy, Check } from "lucide-react";
 import { backendInterface, type Market, type MarketPoint } from "@/backendInterface";
 import { formatCompactNumber, formatCurrency, formatTimestamp } from "@/lib/utils";
 import type { PanelInstance } from "@/hooks/useWorkspaceStore";
@@ -24,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 interface MarketAggregatorPanelProps {
   panel: PanelInstance;
@@ -59,6 +61,16 @@ export function MarketAggregatorPanel({ panel }: MarketAggregatorPanelProps) {
   const [market, setMarket] = useState<Market | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [chartMode, setChartMode] = useState<ChartMode>("mid");
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyMarketId = useCallback(() => {
+    navigator.clipboard.writeText(marketId).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      // Silently fail if clipboard isn't available
+    });
+  }, [marketId]);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -134,8 +146,8 @@ export function MarketAggregatorPanel({ panel }: MarketAggregatorPanelProps) {
   );
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      <Card>
+    <div className="min-h-0 flex-1 h-full overflow-y-auto">
+      <Card className="h-full">
         <CardHeader className="space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -156,7 +168,27 @@ export function MarketAggregatorPanel({ panel }: MarketAggregatorPanelProps) {
               </Select>
             </div>
           </div>
-          <div className="text-xs text-muted-foreground">Market ID: {marketId}</div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Market ID:</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+              onClick={handleCopyMarketId}
+            >
+              {copied ? (
+                <>
+                  <Check className="mr-1 h-3 w-3" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-1 h-3 w-3" />
+                  {marketId.slice(0, 12)}...
+                </>
+              )}
+            </Button>
+          </div>
           {error && <div className="text-sm text-destructive">{error}</div>}
         </CardHeader>
         <CardContent className="space-y-6">

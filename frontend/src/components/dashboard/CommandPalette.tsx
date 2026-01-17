@@ -4,8 +4,9 @@ import { backendInterface } from "@/backendInterface";
 import { getCommandEntries, type CommandParamSchema } from "@/commands/registry";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { agentController, type AgentEvent } from "@/commands/agentController";
+import { agentController } from "@/commands/agentController";
 import { useUIStore } from "@/hooks/useUIStore";
+import { useAgentStore } from "@/hooks/useAgentStore";
 
 type FocusMode = "list" | "param" | "run";
 
@@ -50,11 +51,12 @@ const createEmptySubPalette = (): SubPaletteState => ({
 });
 
 export function CommandPalette() {
-  const { isCommandPaletteOpen: isOpen, closeCommandPalette: onClose, initialCommandId, initialParams } = useUIStore();
+  const { isCommandPaletteOpen: isOpen, closeCommandPalette: onClose, initialCommandId, initialParams, openSidebar } = useUIStore();
+  const { events: agentEvents, addEvents } = useAgentStore();
 
   const [search, setSearch] = useState("");
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
-  const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
+  const [agentCommandRan, setAgentCommandRan] = useState(false);
 
   // State for selection & focus
   const [selectedValue, setSelectedValue] = useState<string>("");
@@ -76,9 +78,10 @@ export function CommandPalette() {
     () =>
       getCommandEntries(async (prompt) => {
         const events = await agentController.processInput(prompt);
-        setAgentEvents((prev) => [...events, ...prev].slice(0, 6));
+        addEvents(events);
+        setAgentCommandRan(true);
       }),
-    []
+    [addEvents]
   );
 
   const commandMap = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
@@ -111,8 +114,13 @@ export function CommandPalette() {
   useEffect(() => {
     if (!isOpen) {
       setSearch("");
+      // If command palette is closing and an agent command was run, open the sidebar
+      if (agentCommandRan) {
+        openSidebar();
+        setAgentCommandRan(false);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, agentCommandRan, openSidebar]);
 
   useEffect(() => {
     if (subPalette.open) {
