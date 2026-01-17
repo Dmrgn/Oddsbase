@@ -44,7 +44,7 @@ Use this to power your global search bar.
 ## 2. Market Context & Linking
 
 ### `GET /markets/{id}`
-Get details for a specific selected market.
+Get details for a specific selected market. Returns a 404 if not found.
 
 ### `GET /markets/{id}/related` (The "Arbitrage" Link)
 Finds the **matching market** on the competitor exchange. Use this to automatically open the comparison view.
@@ -91,7 +91,7 @@ Get recent price history for the chart (up to 1 hour at 1 point/second).
 Connect once to stream updates for *all* active markets.
 
 - **URL**: `ws://localhost:8000/ws`
-- **On Connect**: Send `{"op": "subscribe"}` to start receiving updates
+- **On Connect**: Optionally send `{"op": "subscribe"}` (currently all clients receive broadcasts once connected)
 - **Messages**:
     - `type: "quote"`: New Best Bid/Offer updates.
     - `type: "orderbook"`: Full orderbook snapshot updates.

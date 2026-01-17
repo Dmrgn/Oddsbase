@@ -22,6 +22,13 @@ async def list_markets(source: Optional[str] = None, q: Optional[str] = None):
         ]
     return markets
 
+@router.get("/markets/{market_id}", response_model=Market)
+async def get_market(market_id: str):
+    market = state.get_market(market_id)
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    return market
+
 @router.get("/markets/{market_id}/history", response_model=List[QuotePoint])
 async def get_market_history(market_id: str, outcome_id: Optional[str] = None):
     market = state.get_market(market_id)
@@ -45,6 +52,9 @@ async def get_market_orderbook(market_id: str, outcome_id: Optional[str] = None)
          
     if not outcome_id and market.outcomes:
         outcome_id = market.outcomes[0].outcome_id
+
+    if not outcome_id:
+        return None
 
     return state.get_orderbook(market_id, outcome_id)
 
