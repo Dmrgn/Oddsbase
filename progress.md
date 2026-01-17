@@ -20,6 +20,7 @@
 - [x] Refactored palette state machine to performant list -> param -> run focus flow.
 
 ## Next Steps
+
 - [ ] Connect panels to real backend responses when APIs are ready.
 - [ ] Extend parameter UI (selects, validation) as more commands appear.
 - [ ] Add panel-level controls (close, resize handles, settings).
