@@ -50,11 +50,17 @@ async def lifespan(app: FastAPI):
 
     sub_manager.set_spawner(spawner)
 
-    # Initial fetch (Just to populate catalog so users can subscribe)
-    print("Fetching initial markets (Catalog only)...")
-    await poly_connector.fetch_initial_markets()
-    await kalshi_connector.fetch_initial_markets()
-    print("Market fetch complete. Waiting for subscribers.")
+    # Initial fetch (Backgrounded so server starts immediately)
+    print("Starting background market fetch...")
+    async def fetch_all():
+        print("Fetching Polymarket data...")
+        await poly_connector.fetch_initial_markets()
+        print("Fetching Kalshi data...")
+        await kalshi_connector.fetch_initial_markets()
+        print("Market fetch complete.")
+        
+    asyncio.create_task(fetch_all())
+    print("Server startup complete. Markets loading in background.")
     
     # Link StateManager to WS manager (Broadcast)
     # Note: Connectors call state.update_*, state calls us back.

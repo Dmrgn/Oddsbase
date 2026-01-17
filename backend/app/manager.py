@@ -54,7 +54,7 @@ class SubscriptionManager:
         
         if self.spawner:
             print(f"[Manager] Spawning poller for {market_id}")
-            task = self.spawner(market_id)
+            task = await self.spawner(market_id)  # Await the coroutine
             if task:
                 self.polling_tasks[market_id] = task
 

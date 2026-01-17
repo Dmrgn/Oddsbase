@@ -2,47 +2,119 @@ import asyncio
 import time
 from typing import List, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, HTTPException, Request
+from .state import StateManager
+from .schemas import Market, OrderBook, QuotePoint
 
 router = APIRouter()
 state = StateManager()
 
 @router.get("/markets", response_model=List[Market])
 async def list_markets(request: Request, source: Optional[str] = None, q: Optional[str] = None):
-    # If q is present, perform global search via platform APIs
-    if q:
-        # Check if connectors are available (might be during startup/testing)
-        poly = getattr(request.app.state, "poly", None)
-        kalshi = getattr(request.app.state, "kalshi", None)
-        
-        tasks = []
-        if poly and (not source or source == "polymarket"):
-            tasks.append(poly.search_markets(q))
-        if kalshi and (not source or source == "kalshi"):
-            tasks.append(kalshi.search_markets(q))
-            
-        if tasks:
-            results_list = await asyncio.gather(*tasks)
-            # Flatten results
-            external_markets = [item for sublist in results_list for item in sublist]
-            
-            # Update state with found markets so they can be retrieved/polled later
-            for m in external_markets:
-                 state.update_market(m)
-                 
-            return external_markets
-
-    # Fallback to local state if no query or search failed (or for pure listing)
+    """
+    List/search markets (legacy endpoint, use /markets/search for advanced features).
+    """
     markets = state.get_all_markets()
+    
     if source:
         markets = [m for m in markets if m.source == source]
+    
     if q:
         q_lower = q.lower()
-        # Search in Title OR any Outcome Name
         markets = [
             m for m in markets 
-            if q_lower in m.title.lower() or any(q_lower in o.name.lower() for o in m.outcomes)
+            if q_lower in m.title.lower() 
+            or (m.description and q_lower in m.description.lower())
+            or any(q_lower in o.name.lower() for o in m.outcomes)
         ]
+    
     return markets
+
+
+@router.get("/markets/search")
+async def search_markets(
+    request: Request,
+    q: Optional[str] = None,
+    sector: Optional[str] = None,
+    tags: Optional[List[str]] = Query(None),
+    source: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    """
+    Advanced search with filters and relevance scoring.
+    
+    On-demand mode: When searching Kalshi, queries their API directly
+    and caches results progressively.
+    """
+    # === ON-DEMAND KALSHI SEARCH ===
+    # If user has a query and is searching Kalshi (or all sources), 
+    # trigger on-demand API search
+    if q and (not source or source == "kalshi"):
+        kalshi = getattr(request.app.state, "kalshi", None)
+        if kalshi:
+            # This searches Kalshi API and caches results
+            await kalshi.search_markets(q)
+    
+    markets = state.get_all_markets()
+    
+    # === FILTERS ===
+    if source:
+        markets = [m for m in markets if m.source == source]
+    if sector:
+        markets = [m for m in markets if m.sector == sector]
+    if tags:
+        tags_lower = [t.lower() for t in tags]
+        markets = [m for m in markets if any(
+            t.lower() in tags_lower for t in m.tags
+        )]
+    
+    # === KEYWORD SEARCH with relevance scoring ===
+    if q:
+        q_lower = q.lower()
+        scored = []
+        for m in markets:
+            score = 0
+            if q_lower in m.title.lower():
+                score += 10
+                if m.title.lower().startswith(q_lower):
+                    score += 5
+            if m.description and q_lower in m.description.lower():
+                score += 3
+            if any(q_lower in t.lower() for t in m.tags):
+                score += 2
+            if any(q_lower in o.name.lower() for o in m.outcomes):
+                score += 1
+            
+            if score > 0:
+                scored.append((m, score))
+        
+        scored.sort(key=lambda x: x[1], reverse=True)
+        markets = [m for m, _ in scored]
+    
+    total = len(markets)
+    paginated = markets[offset:offset + limit]
+    
+    # === FACETS for UI ===
+    all_markets = state.get_all_markets()
+    facets = {
+        "sectors": {},
+        "sources": {"polymarket": 0, "kalshi": 0},
+        "tags": {}
+    }
+    for m in all_markets:
+        if m.sector:
+            facets["sectors"][m.sector] = facets["sectors"].get(m.sector, 0) + 1
+        facets["sources"][m.source] += 1
+        for t in m.tags[:3]:
+            facets["tags"][t] = facets["tags"].get(t, 0) + 1
+    
+    facets["tags"] = dict(sorted(facets["tags"].items(), key=lambda x: -x[1])[:20])
+    
+    return {
+        "markets": paginated,
+        "total": total,
+        "facets": facets
+    }
 
 @router.get("/markets/{market_id}/history", response_model=List[QuotePoint])
 async def get_market_history(market_id: str, outcome_id: Optional[str] = None):
@@ -98,6 +170,9 @@ class ConnectionManager:
                 await connection.send_json(message)
             except:
                 pass 
+
+# Instantiate manager for export
+manager = ConnectionManager()
 
 from .manager import SubscriptionManager
 import json
