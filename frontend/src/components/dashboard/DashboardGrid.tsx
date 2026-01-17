@@ -1,4 +1,5 @@
-import { Responsive, WidthProvider } from "react-grid-layout";
+import { useLayoutEffect, useRef, useState } from "react";
+import { Responsive } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import { PanelRegistry } from "@/components/panels/PanelRegistry";
@@ -14,9 +15,23 @@ type GridLayoutItem = {
 
 type GridLayout = ReadonlyArray<GridLayoutItem>;
 
-const ResponsiveGridLayout = WidthProvider(Responsive);
-
 export function DashboardGrid() {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+    const element = containerRef.current;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const nextWidth = entry.contentRect.width;
+      setContainerWidth((prev) => (prev !== nextWidth ? nextWidth : prev));
+    });
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
   const panels = useWorkspaceStore((state: { panels: PanelInstance[] }) => state.panels);
   const updateLayout = useWorkspaceStore(
     (state: { updateLayout: (id: string, layout: Pick<PanelInstance, "x" | "y" | "w" | "h">) => void }) =>
@@ -34,8 +49,8 @@ export function DashboardGrid() {
     }));
 
   return (
-    <div className="h-full w-full">
-      <ResponsiveGridLayout
+    <div className="h-full w-full" ref={containerRef}>
+      <Responsive
         className="layout"
         autoSize
         layouts={{ lg: layout }}
@@ -43,6 +58,7 @@ export function DashboardGrid() {
         cols={{ lg: 12, md: 10, sm: 6, xs: 4, xxs: 2 }}
         rowHeight={60}
         margin={[16, 16]}
+        width={containerWidth}
         draggableHandle=".panel-drag-handle"
         draggableCancel=".panel-content"
         onLayoutChange={(currentLayout: GridLayout, _allLayouts: Partial<Record<string, GridLayout>>) => {
@@ -58,7 +74,7 @@ export function DashboardGrid() {
               <PanelRegistry panel={panel} />
             </div>
           ))}
-      </ResponsiveGridLayout>
+      </Responsive>
     </div>
   );
 }
