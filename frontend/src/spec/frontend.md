@@ -4,21 +4,32 @@ This specification defines a modular, agentic dashboard for prediction market da
 
 ## 1. Project Directory Structure
 ```text
-frontend/
-├── src/
-│   ├── backendInterface.ts    # Layer 1: API & WebSocket Logic
-│   ├── commands/              # Layer 2: Command Registry & Agent Logic
-│   │   ├── registry.ts
-│   │   └── agentController.ts
-│   ├── components/            # Layer 3: UI Components
-│   │   ├── dashboard/         # Grid and Layout components
-│   │   ├── panels/            # Panel "Classes" (Aggregator, News)
-│   │   └── ui/                # Shadcn primitives
-│   ├── hooks/                 # useStore, useSocket, useAgent
-│   ├── utils/                 # Layer 4: Pure transformation logic
-│   └── App.tsx                # Entry point
-├── public/
-└── package.json
+.
+├── backend/                  # Layer 0: Python/FastAPI Backend
+│   ├── main.py               # API Entry point
+│   └── ...
+├── frontend/                 # React/TypeScript Frontend
+│   ├── src/
+│   │   ├── backendInterface.ts # Layer 1: API & WebSocket Logic
+│   │   ├── commands/           # Layer 2: Command Registry & Agent Logic
+│   │   │   ├── registry.ts
+│   │   │   └── agentController.ts
+│   │   ├── components/         # Layer 3: UI Components
+│   │   │   ├── dashboard/      # Grid and Layout components
+│   │   │   ├── panels/         # Panel "Classes" (Aggregator, News)
+│   │   │   └── ui/             # Shadcn primitives
+│   │   ├── hooks/              # useStore, useSocket, useAgent
+│   │   ├── lib/                # Layer 4: Shared utilities (utils.ts)
+│   │   ├── spec/               # Specification/Docs
+│   │   │   └── frontend.md
+│   │   ├── App.tsx             # Main React entry component
+│   │   ├── index.tsx           # Web entry point
+│   │   └── ...
+│   ├── styles/               # Styling (globals.css)
+│   ├── package.json
+│   └── ...
+├── app.md                    # Global Application Specification
+└── .gitignore
 ```
 
 ---
