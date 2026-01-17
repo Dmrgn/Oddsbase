@@ -7,6 +7,11 @@ from .connectors.polymarket import PolymarketConnector
 from .connectors.kalshi import KalshiConnector
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).parent.parent / ".env")
+
 # Global connectors
 poly_connector = None
 kalshi_connector = None

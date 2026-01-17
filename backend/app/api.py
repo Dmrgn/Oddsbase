@@ -6,23 +6,10 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, HTTPExcept
 from fastapi.responses import StreamingResponse
 from .state import StateManager
 from .schemas import Market, OrderBook, QuotePoint
+from news.fetcher import news_fetcher  # type: ignore
 
 router = APIRouter()
 state = StateManager()
-
-# Import news fetcher
-try:
-    import sys
-    from pathlib import Path
-    news_path = Path(__file__).parent.parent / "news"
-    if str(news_path) not in sys.path:
-        sys.path.insert(0, str(news_path))
-    from news.fetcher import news_fetcher  # type: ignore
-    NEWS_AVAILABLE = True
-except Exception as e:
-    print(f"News fetcher not available: {e}")
-    NEWS_AVAILABLE = False
-    news_fetcher = None  # type: ignore
 
 @router.get("/markets/search")
 async def search_markets(
@@ -230,8 +217,6 @@ async def search_news(
     
     Returns a JSON array of articles or streams results via SSE.
     """
-    if not NEWS_AVAILABLE or not news_fetcher:
-        raise HTTPException(status_code=503, detail="News service not available")
     
     if not q or not q.strip():
         return []
