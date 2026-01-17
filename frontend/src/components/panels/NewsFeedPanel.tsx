@@ -1,41 +1,26 @@
-import { useEffect, useState } from "react";
-import { backendInterface, type NewsItem } from "@/backendInterface";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatTimestamp } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 import type { PanelInstance } from "@/hooks/useWorkspaceStore";
+import { useNewsSearch } from "@/hooks/useNewsSearch";
 
 interface NewsFeedPanelProps {
   panel: PanelInstance;
 }
 
-const sentimentStyles: Record<NewsItem["sentiment"], string> = {
-  positive: "bg-emerald-500/10 text-emerald-600",
-  neutral: "bg-slate-500/10 text-slate-600",
-  negative: "bg-rose-500/10 text-rose-600",
-};
-
 export function NewsFeedPanel({ panel }: NewsFeedPanelProps) {
-  const query = String(panel.data.query ?? "");
-  const [items, setItems] = useState<NewsItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const defaultQuery = String(panel.data.query ?? "stock");
+  const [inputValue, setInputValue] = useState("");
+  const [submittedQuery, setSubmittedQuery] = useState(defaultQuery);
+  const state = useNewsSearch(submittedQuery);
 
-  useEffect(() => {
-    let isMounted = true;
-    backendInterface
-      .fetchNews(query)
-      .then((data) => {
-        if (!isMounted) return;
-        setItems(data.items ?? []);
-      })
-      .catch((err) => {
-        if (!isMounted) return;
-        setError(err.message ?? "Unable to load news");
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [query]);
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const queryToSearch = inputValue.trim() || defaultQuery;
+      setSubmittedQuery(queryToSearch);
+    }
+  };
 
   return (
     <Card className="flex h-full flex-col">
@@ -43,37 +28,59 @@ export function NewsFeedPanel({ panel }: NewsFeedPanelProps) {
         <CardTitle>{String(panel.data.title ?? "News Feed")}</CardTitle>
       </CardHeader>
       <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-        <div className="text-sm text-muted-foreground">Query: {query}</div>
-        {error && <div className="text-sm text-destructive">{error}</div>}
-        {!error && items.length === 0 && (
+        <Input
+          type="text"
+          placeholder="prediction markets"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          className="w-full"
+        />
+
+        {state.status === "loading" && (
           <div className="text-sm text-muted-foreground">Loading news…</div>
         )}
-        <div className="space-y-3">
-          {items.map((item) => (
-            <a
-              key={item.id}
-              href={item.url}
-              target="_blank"
-              rel="noreferrer"
-              className="block rounded-lg border border-border p-3 transition hover:bg-muted"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="font-medium text-sm leading-tight">{item.title}</div>
-                <span
-                  className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                    sentimentStyles[item.sentiment]
-                  }`}
-                >
-                  {item.sentiment}
-                </span>
-              </div>
-              <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                <span>{item.source}</span>
-                <span>{formatTimestamp(item.publishedAt)}</span>
-              </div>
-            </a>
-          ))}
-        </div>
+
+        {state.status === "error" && (
+          <div className="text-sm text-destructive">{state.error}</div>
+        )}
+
+        {state.status === "success" && state.articles.length === 0 && (
+          <div className="text-sm text-muted-foreground">
+            No results for "{submittedQuery}"
+          </div>
+        )}
+
+        {state.status === "success" && state.articles.length > 0 && (
+          <div className="space-y-3">
+            {state.articles.map((article, index) => (
+              <a
+                key={`${article.source}-${index}`}
+                href={article.url}
+                target="_blank"
+                rel="noreferrer"
+                className="block rounded-lg border border-border p-3 transition hover:bg-muted"
+              >
+                <div className="font-medium text-sm leading-tight">
+                  {article.title}
+                </div>
+                {article.description && (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {article.description}
+                  </div>
+                )}
+                <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase">
+                    {article.source}
+                  </span>
+                  {article.published_at && (
+                    <span>{String(article.published_at)}</span>
+                  )}
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
