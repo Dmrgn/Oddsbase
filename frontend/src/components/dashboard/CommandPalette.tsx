@@ -1,14 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Command } from "cmdk";
-import { getCommandEntries, type CommandEntry, type CommandParamSchema } from "@/commands/registry";
+import { getCommandEntries, type CommandParamSchema } from "@/commands/registry";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { agentController, type AgentEvent } from "@/commands/agentController";
-
-interface CommandPaletteProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
+import { useUIStore } from "@/hooks/useUIStore";
 
 type FocusMode = "list" | "param" | "run";
 
@@ -18,11 +14,13 @@ const buildInitialValues = (params?: CommandParamSchema[]) =>
     return acc;
   }, {}) ?? {};
 
-export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
+export function CommandPalette() {
+  const { isCommandPaletteOpen: isOpen, closeCommandPalette: onClose, initialCommandId, initialParams } = useUIStore();
+
   const [search, setSearch] = useState("");
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [agentEvents, setAgentEvents] = useState<AgentEvent[]>([]);
-  
+
   // State for selection & focus
   const [selectedValue, setSelectedValue] = useState<string>("");
   const [focusMode, setFocusMode] = useState<FocusMode>("list");
@@ -32,8 +30,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const paramRefs = useRef<(HTMLInputElement | null)[]>([]);
   const runButtonRef = useRef<HTMLButtonElement | null>(null);
-  // We can track the list item node if needed, but cmdk usually handles list focus self-contained.
-  // However, to "return focus to list", we might just focus the search input which cmdk binds to the list.
 
   const entries = useMemo(
     () =>
@@ -45,6 +41,37 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
   );
 
   const commandMap = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
+
+  // Handle initial store values when opening
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (initialCommandId) {
+      const entry = commandMap.get(initialCommandId);
+      if (entry) {
+        setSelectedValue(initialCommandId);
+        const defaults = buildInitialValues(entry.params);
+        setParamValues({ ...defaults, ...initialParams });
+        if (entry.params && entry.params.length > 0) {
+          setFocusMode("param");
+          setActiveParamIndex(0);
+        } else {
+          setFocusMode("run");
+        }
+      }
+      return;
+    }
+
+    setSearch("");
+    setFocusMode("list");
+    setActiveParamIndex(0);
+  }, [isOpen, initialCommandId, initialParams, commandMap]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setSearch("");
+    }
+  }, [isOpen]);
 
   const filteredEntries = entries.filter((entry) => {
     if (!search.trim()) return true;
@@ -62,20 +89,6 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       setActiveParamIndex(0);
     }
   }, [activeEntry, focusMode]);
-
-  // Global hotkey to open
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "p") {
-        event.preventDefault();
-        if (isOpen) {
-          onClose();
-        }
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [isOpen, onClose]);
 
   // Effects to handle focus moves
   useEffect(() => {

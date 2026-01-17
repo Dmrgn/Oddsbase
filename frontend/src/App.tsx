@@ -3,8 +3,9 @@ import "./index.css";
 import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { CommandPalette } from "@/components/dashboard/CommandPalette";
 import { AgentStatus } from "@/components/dashboard/AgentStatus";
-import { Button } from "@/components/ui/button";
 import { useWorkspaceStore, type PanelInstance } from "@/hooks/useWorkspaceStore";
+import { useUIStore } from "@/hooks/useUIStore";
+import { Kbd } from "./components/ui/kbd";
 
 export function App() {
   const panels = useWorkspaceStore((state: { panels: PanelInstance[] }) => state.panels);
@@ -12,20 +13,25 @@ export function App() {
     (state: { openPanel: (type: PanelInstance["type"], data?: Record<string, unknown>) => string }) =>
       state.openPanel
   );
-  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  const { openCommandPalette, closeCommandPalette, isCommandPaletteOpen } = useUIStore();
   const [agentEvents] = useState<string[]>([]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "p") {
         event.preventDefault();
-        setPaletteOpen(true);
+        if (isCommandPaletteOpen) {
+          closeCommandPalette();
+        } else {
+          openCommandPalette();
+        }
       }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [openCommandPalette, closeCommandPalette, isCommandPaletteOpen]);
 
   useEffect(() => {
     if (panels.length === 0) {
@@ -43,9 +49,8 @@ export function App() {
           <div className="text-xl font-semibold">Workspace</div>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => setPaletteOpen(true)}>
-            Open Command Palette
-          </Button>
+              <Kbd>⌘ ⇧ P</Kbd>
+              <span>Command Palette</span>
         </div>
       </header>
 
@@ -58,7 +63,7 @@ export function App() {
         </aside>
       </main>
 
-      <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <CommandPalette />
     </div>
   );
 }

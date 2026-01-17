@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { backendInterface, type MarketPoint } from "@/backendInterface";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCompactNumber, formatCurrency, formatTimestamp } from "@/lib/utils";
 import type { PanelInstance } from "@/hooks/useWorkspaceStore";
 
@@ -48,39 +47,34 @@ export function MarketAggregatorPanel({ panel }: MarketAggregatorPanelProps) {
   }, [points]);
 
   return (
-    <Card className="flex h-full flex-col">
-      <CardHeader className="shrink-0">
-        <CardTitle>{String(panel.data.title ?? "Market Aggregator")}</CardTitle>
-      </CardHeader>
-      <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
-        <div className="text-sm text-muted-foreground">Market ID: {marketId}</div>
-        {error && <div className="text-sm text-destructive">{error}</div>}
-        {!error && points.length === 0 && (
-          <div className="text-sm text-muted-foreground">Loading market data…</div>
-        )}
-        {latestPoint && (
-          <div className="grid gap-4 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Latest Price</span>
-              <span className="font-medium">{formatCurrency(latestPoint.price)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Price Change</span>
-              <span className={delta !== null && delta >= 0 ? "text-emerald-500" : "text-rose-500"}>
-                {delta !== null ? formatCurrency(delta) : "—"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Volume</span>
-              <span className="font-medium">{formatCompactNumber(latestPoint.volume)}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Last Update</span>
-              <span className="font-medium">{formatTimestamp(latestPoint.timestamp)}</span>
-            </div>
+    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+      <div className="text-sm text-muted-foreground">Market ID: {marketId}</div>
+      {error && <div className="text-sm text-destructive">{error}</div>}
+      {!error && points.length === 0 && (
+        <div className="text-sm text-muted-foreground">Loading market data…</div>
+      )}
+      {latestPoint && (
+        <div className="grid gap-4 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Latest Price</span>
+            <span className="font-medium">{formatCurrency(latestPoint.price)}</span>
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Price Change</span>
+            <span className={delta !== null && delta >= 0 ? "text-emerald-500" : "text-rose-500"}>
+              {delta !== null ? formatCurrency(delta) : "—"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Volume</span>
+            <span className="font-medium">{formatCompactNumber(latestPoint.volume)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Last Update</span>
+            <span className="font-medium">{formatTimestamp(latestPoint.timestamp)}</span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -46,7 +46,7 @@ This plan outlines the steps to implement the Predictive Market Dashboard fronte
   - `CLOSE_PANEL(id)`
   - `QUERY_MARKET(id)`
 - Add agent controller loop (Thought → Action → Observation) in `agentController.ts`.
-- Restrict command layer usage to the agent and command palette.
+- Allow panels to access the command layer (e.g. for "Edit" functionality).
 
 ## 7. Command Palette & Agent UI
 - Add `cmdk` (Shadcn Command) UI for command execution.
