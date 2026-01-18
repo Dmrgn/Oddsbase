@@ -46,13 +46,6 @@ function AppContent() {
     return () => window.removeEventListener("keydown", handler);
   }, [openCommandPalette, closeCommandPalette, isCommandPaletteOpen]);
 
-  useEffect(() => {
-    if (panels.length === 0) {
-      openPanel("MARKET_AGGREGATOR_GRAPH", { marketId: "demo-market" });
-      openPanel("NEWS_FEED", { query: "prediction markets" });
-    }
-  }, [openPanel, panels.length]);
-
   return (
     <>
       <header
