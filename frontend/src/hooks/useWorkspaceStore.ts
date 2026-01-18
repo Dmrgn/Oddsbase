@@ -42,7 +42,7 @@ const defaultPanelData: Record<PanelType, Record<string, unknown>> = {
   },
   CHART: {
     marketId: "demo-market",
-    title: "Chart",
+    title: null,
   },
   ORDER_BOOK: {
     marketId: "demo-market",

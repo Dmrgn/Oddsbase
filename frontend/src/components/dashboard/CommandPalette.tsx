@@ -206,6 +206,10 @@ export function CommandPalette() {
   useEffect(() => {
     if (!isOpen) {
       setSearch("");
+      setFocusMode("list");
+      setActiveParamIndex(0);
+      setSubPalette(createEmptySubPalette());
+
       // If command palette is closing and an agent command was run, open the sidebar
       if (agentCommandRan) {
         openSidebar();
@@ -216,11 +220,17 @@ export function CommandPalette() {
 
   useEffect(() => {
     if (subPalette.open) {
-      requestAnimationFrame(() => {
-        subPaletteInputRef.current?.focus();
-      });
+      // Small timeout to allow render
+      const timer = setTimeout(() => {
+        if (subPalette.type === 'market') {
+          // processed inside MarketSearchInput via autoFocus, but just in case
+        } else {
+          subPaletteInputRef.current?.focus();
+        }
+      }, 50);
+      return () => clearTimeout(timer);
     }
-  }, [subPalette.open]);
+  }, [subPalette.open, subPalette.type]);
 
   const filteredEntries = entries.filter((entry) => {
     if (!search.trim()) return true;
@@ -421,48 +431,24 @@ export function CommandPalette() {
 
     let active = true;
     debounceRef.current = window.setTimeout(() => {
+      console.log('[CommandPalette] Searching markets for:', query);
       backendInterface
-        .searchEvents(query)
+        .searchMarkets(query)
         .then((result) => {
           if (!active) return;
 
-          // Flatten events into individual market options, grouped by event
-          const options: SubPaletteOption[] = [];
+          console.log('[CommandPalette] Search results:', result.total, 'markets');
 
-          // Add markets from events
-          for (const event of result.events) {
-            for (const market of event.markets) {
-              // Try to make a nice label
-              // e.g. "Fed Rate: No Change"
-              let label = market.title;
-              if (label.startsWith(event.title)) {
-                label = event.title + ": " + label.slice(event.title.length).replace(/^[ -]+/, "");
-              }
-
-              options.push({
-                value: market.market_id,
-                label: label,
-                description: `${event.source.toUpperCase()} • ${event.title}`,
-                meta: {
-                  source: event.source,
-                  price: market.outcomes?.[0]?.price
-                }
-              });
+          // Convert markets to options
+          const options: SubPaletteOption[] = result.markets.map((market) => ({
+            value: market.market_id,
+            label: market.title,
+            description: `${market.source.toUpperCase()} • ${market.category || 'Market'}`,
+            meta: {
+              source: market.source,
+              price: market.outcomes?.[0]?.price
             }
-          }
-
-          // Add standalone markets
-          for (const market of result.markets) {
-            options.push({
-              value: market.market_id,
-              label: market.title,
-              description: `${market.source.toUpperCase()} • standalone`,
-              meta: {
-                source: market.source,
-                price: market.outcomes?.[0]?.price
-              }
-            });
-          }
+          }));
 
           setSubPalette((prev) => ({
             ...prev,
@@ -669,7 +655,17 @@ export function CommandPalette() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (subPalette.open) return;
+    // If sub-palette is open, we generally let it handle its own keys (like in MarketSearchInput)
+    // BUT if the focus somehow leaked to this container, we should trap Escape to close it.
+    if (subPalette.open) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        closeSubPalette(true);
+      }
+      return;
+    }
+
     // If we're in the list, cmdk handles Up/Down. We listen for Enter to move to params.
     if (focusMode === "list") {
       if (e.key === "Enter") {
@@ -681,6 +677,9 @@ export function CommandPalette() {
         } else {
           setFocusMode("run");
         }
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
       }
       return;
     }
@@ -698,12 +697,7 @@ export function CommandPalette() {
       }
       if (e.key === "Escape") {
         e.preventDefault();
-        // Go back up
-        if (activeParamIndex > 0) {
-          setActiveParamIndex(activeParamIndex - 1);
-        } else {
-          setFocusMode("list");
-        }
+        onClose();
       }
       return;
     }
@@ -716,13 +710,7 @@ export function CommandPalette() {
       }
       if (e.key === "Escape") {
         e.preventDefault();
-        const totalParams = activeEntry?.params?.length ?? 0;
-        if (totalParams > 0) {
-          setFocusMode("param");
-          setActiveParamIndex(totalParams - 1);
-        } else {
-          setFocusMode("list");
-        }
+        onClose();
       }
     }
   };
@@ -730,8 +718,9 @@ export function CommandPalette() {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-6">
-      <div className="relative w-full max-w-2xl rounded-xl border border-border bg-card shadow-xl" onKeyDown={handleKeyDown}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center p-6">
+      <div className="absolute inset-0 bg-black/40" onPointerDown={() => onClose()} />
+      <div className="relative z-10 w-full max-w-2xl rounded-xl border border-border bg-card shadow-xl" onKeyDown={handleKeyDown}>
         <Command
           className="w-full"
           loop
@@ -891,107 +880,79 @@ export function CommandPalette() {
             )}
           </div>
         </Command>
+      </div>
 
-        {subPalette.open && subPalette.type === 'market' ? (
-          <MarketSearchInput
-            isOpen={subPalette.open}
-            onOpenChange={(open) => {
-              if (!open) closeSubPalette(true);
-            }}
-            onSelect={(market) => {
-              // Construct a mock option to reuse existing handler
-              const option: SubPaletteOption = {
-                value: market.market_id,
-                label: market.title,
-                meta: {
-                  source: market.source
-                }
-              };
-              handleSubPaletteSelect(option);
-            }}
-            autoClose={false}
-            suggestedMarkets={subPalette.suggestedOptions}
-          />
-        ) : subPalette.open && (
-          <div
-            className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 p-6"
-            onKeyDown={handleSubPaletteKeyDown}
-          >
-            <div className="w-full max-w-xl rounded-xl border border-border bg-card shadow-xl">
-              <div className="border-b border-border p-4">
-                <div className="text-sm font-semibold">{subPalette.title}</div>
-                <div className="mt-2">
-                  <Input
-                    ref={subPaletteInputRef}
-                    value={subPalette.query}
-                    placeholder="Search options..."
-                    onChange={(event) =>
-                      setSubPalette((prev) => ({
-                        ...prev,
-                        query: event.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="max-h-64 overflow-y-auto p-2">
-                {!subPalette.query.trim() &&
-                  subPalette.suggestedOptions &&
-                  subPalette.suggestedOptions.length > 0 && (
-                    <>
-                      <div className="px-3 py-2 text-xs font-medium text-muted-foreground">✨ Suggested</div>
-                      <div className="space-y-1 mb-2">
-                        {subPalette.suggestedOptions.map((option, index) => (
-                          <button
-                            key={`suggested-${option.value}`}
-                            type="button"
-                            onClick={() => handleSubPaletteSelect(option)}
-                            className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
-                              index === subPaletteIndex ? "bg-muted" : "hover:bg-muted"
-                            }`}
-                          >
-                            <div className="font-medium text-foreground">{option.label}</div>
-                            {option.description && (
-                              <div className="text-xs text-muted-foreground">{option.description}</div>
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                      {filteredSubPaletteOptions.length > 0 && (
-                        <div className="border-t border-border my-2"></div>
-                      )}
-                    </>
-                  )}
-                {subPalette.loading ? (
-                  <div className="p-4 text-sm text-muted-foreground">Searching…</div>
-                ) : filteredSubPaletteOptions.length === 0 ? (
-                  <div className="p-4 text-sm text-muted-foreground">
-                    {subPalette.emptyMessage || "No results"}
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {filteredSubPaletteOptions.map((option, index) => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => handleSubPaletteSelect(option)}
-                        className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${index === subPaletteIndex ? "bg-muted" : "hover:bg-muted"
-                          }`}
-                      >
-                        <div className="font-medium text-foreground">{option.label}</div>
-                        {option.description && (
-                          <div className="text-xs text-muted-foreground">{option.description}</div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
+      {subPalette.open && subPalette.type === 'market' ? (
+        <MarketSearchInput
+          isOpen={subPalette.open}
+          onOpenChange={(open) => {
+            if (!open) closeSubPalette(true);
+          }}
+          onSelect={(market) => {
+            // Construct a mock option to reuse existing handler
+            const option: SubPaletteOption = {
+              value: market.market_id,
+              label: market.title,
+              meta: {
+                source: market.source
+              }
+            };
+            handleSubPaletteSelect(option);
+          }}
+          autoClose={false}
+        />
+      ) : subPalette.open && (
+        <div
+          className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 p-6"
+          onKeyDown={handleSubPaletteKeyDown}
+        >
+          <div className="w-full max-w-xl rounded-xl border border-border bg-card shadow-xl">
+            <div className="border-b border-border p-4">
+              <div className="text-sm font-semibold">{subPalette.title}</div>
+              <div className="mt-2">
+                <Input
+                  ref={subPaletteInputRef}
+                  value={subPalette.query}
+                  placeholder="Search options..."
+                  onChange={(event) =>
+                    setSubPalette((prev) => ({
+                      ...prev,
+                      query: event.target.value,
+                    }))
+                  }
+                />
               </div>
             </div>
+
+            <div className="max-h-64 overflow-y-auto p-2">
+              {subPalette.loading ? (
+                <div className="p-4 text-sm text-muted-foreground">Searching…</div>
+              ) : filteredSubPaletteOptions.length === 0 ? (
+                <div className="p-4 text-sm text-muted-foreground">
+                  {subPalette.emptyMessage || "No results"}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {filteredSubPaletteOptions.map((option, index) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleSubPaletteSelect(option)}
+                      className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${index === subPaletteIndex ? "bg-muted" : "hover:bg-muted"
+                        }`}
+                    >
+                      <div className="font-medium text-foreground">{option.label}</div>
+                      {option.description && (
+                        <div className="text-xs text-muted-foreground">{option.description}</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

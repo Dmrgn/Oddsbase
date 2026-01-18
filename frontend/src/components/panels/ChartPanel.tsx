@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MarketSearchInput } from "@/components/shared/MarketSearchInput";
+import { PanelMenu } from "./PanelMenu";
 
 interface ChartPanelProps {
   panel: PanelInstance;
@@ -99,7 +100,7 @@ export function ChartPanel({ panel }: ChartPanelProps) {
   }, [panel.id, updatePanel]);
 
   // Fetch data function
-  const fetchData = useCallback(async (showLoading = false) => {
+  const fetchData = useCallback(async (showLoading = false, shouldResetOutcomes = false) => {
     if (showLoading) setLoading(true);
     setIsRefreshing(true);
     setError(null);
@@ -112,8 +113,14 @@ export function ChartPanel({ panel }: ChartPanelProps) {
       setHistory(data.history);
       setLastUpdate(new Date());
 
-      // Enable all outcomes by default on first load
-      if (enabledOutcomes.size === 0) {
+      // Update panel title in store if not set or different (and not generic)
+      // This ensures panel actions like News Feed have the correct title
+      if (panel.data.title !== data.market.title) {
+        updatePanel(panel.id, { title: data.market.title });
+      }
+
+      // Enable all outcomes by default on first load or if requested
+      if (shouldResetOutcomes || enabledOutcomes.size === 0) {
         setEnabledOutcomes(new Set(Object.keys(data.outcomes)));
       }
 
@@ -128,7 +135,7 @@ export function ChartPanel({ panel }: ChartPanelProps) {
   // Initial fetch and re-fetch on timeRange or market change
   useEffect(() => {
     setEnabledOutcomes(new Set()); // Reset outcomes when market changes
-    fetchData(true);
+    fetchData(true, true);
   }, [currentMarketId, timeRange]);
 
   // Set up periodic refresh
@@ -225,6 +232,8 @@ export function ChartPanel({ panel }: ChartPanelProps) {
   // Build chart config
   const chartConfig = useMemo<ChartConfig>(() => {
     const config: ChartConfig = {};
+    if (!outcomes) return config;
+
     const outcomeIds = Object.keys(outcomes);
 
     outcomeIds.forEach((outcomeId, index) => {
@@ -254,7 +263,7 @@ export function ChartPanel({ panel }: ChartPanelProps) {
                 className="text-left w-full group flex items-center gap-2"
               >
                 <h3 className="font-semibold text-lg leading-tight truncate group-hover:text-primary transition-colors">
-                  {market?.title ?? "Market"}
+                  {String(market?.title || (panel.data.title && panel.data.title !== "Chart" ? panel.data.title : "Super Chart"))}
                 </h3>
                 <Search className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
               </button>
@@ -293,12 +302,14 @@ export function ChartPanel({ panel }: ChartPanelProps) {
             >
               {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
             </Button>
+
+            <PanelMenu panel={panel} />
           </div>
         </div>
       </div>
 
       {/* Outcome Legend */}
-      {Object.keys(outcomes).length > 0 && (
+      {outcomes && Object.keys(outcomes).length > 0 && (
         <div className="px-3 py-2 border-b flex flex-wrap gap-x-4 gap-y-1 text-xs">
           {Object.entries(outcomes).map(([outcomeId, info], index) => {
             const color = OUTCOME_COLORS[index % OUTCOME_COLORS.length];
@@ -369,7 +380,7 @@ export function ChartPanel({ panel }: ChartPanelProps) {
                   content={<ChartTooltipContent />}
                 />
 
-                {Object.keys(outcomes).map((outcomeId, index) => {
+                {outcomes && Object.keys(outcomes).map((outcomeId, index) => {
                   if (!enabledOutcomes.has(outcomeId)) return null;
                   const color = OUTCOME_COLORS[index % OUTCOME_COLORS.length];
 
