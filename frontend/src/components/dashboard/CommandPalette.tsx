@@ -942,6 +942,5 @@ export function CommandPalette() {
         </div>
       )}
     </div>
-    </div >
   );
 }
