@@ -21,26 +21,38 @@ export function DashboardGrid() {
 
   useLayoutEffect(() => {
     if (!containerRef.current) return;
+
     const element = containerRef.current;
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
+
       const nextWidth = entry.contentRect.width;
-      setContainerWidth((prev) => (prev !== nextWidth ? nextWidth : prev));
+      setContainerWidth((prev) =>
+        prev !== nextWidth ? nextWidth : prev
+      );
     });
 
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  const panels = useWorkspaceStore((state: { panels: PanelInstance[] }) => state.panels);
+
+  const panels = useWorkspaceStore(
+    (state: { panels: PanelInstance[] }) => state.panels
+  );
+
   const updateLayout = useWorkspaceStore(
-    (state: { updateLayout: (id: string, layout: Pick<PanelInstance, "x" | "y" | "w" | "h">) => void }) =>
-      state.updateLayout
+    (state: {
+      updateLayout: (
+        id: string,
+        layout: Pick<PanelInstance, "x" | "y" | "w" | "h">
+      ) => void;
+    }) => state.updateLayout
   );
 
   const layout: GridLayoutItem[] = panels
-    .filter((panel: PanelInstance) => panel.isVisible)
-    .map((panel: PanelInstance) => ({
+    .filter((panel) => panel.isVisible)
+    .map((panel) => ({
       i: panel.id,
       x: panel.x,
       y: panel.y,
@@ -49,7 +61,16 @@ export function DashboardGrid() {
     }));
 
   return (
-    <div className="h-full w-full" ref={containerRef}>
+    <div
+      ref={containerRef}
+      className="h-full w-full"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle, rgba(120,120,120,0.35) 1px, transparent 1px)",
+        backgroundSize: "24px 24px",
+        backgroundPosition: "0 0",
+      }}
+    >
       <Responsive
         className="layout"
         autoSize
@@ -61,16 +82,29 @@ export function DashboardGrid() {
         width={containerWidth}
         draggableHandle=".panel-drag-handle"
         draggableCancel=".panel-content"
-        onLayoutChange={(currentLayout: GridLayout, _allLayouts: Partial<Record<string, GridLayout>>) => {
-          currentLayout.forEach((item: GridLayoutItem) => {
-            updateLayout(item.i, { x: item.x, y: item.y, w: item.w, h: item.h });
+        onLayoutChange={(currentLayout: GridLayout) => {
+          currentLayout.forEach((item) => {
+            updateLayout(item.i, {
+              x: item.x,
+              y: item.y,
+              w: item.w,
+              h: item.h,
+            });
           });
         }}
       >
         {panels
-          .filter((panel: PanelInstance) => panel.isVisible)
-          .map((panel: PanelInstance) => (
-            <div key={panel.id} data-grid={{ x: panel.x, y: panel.y, w: panel.w, h: panel.h }}>
+          .filter((panel) => panel.isVisible)
+          .map((panel) => (
+            <div
+              key={panel.id}
+              data-grid={{
+                x: panel.x,
+                y: panel.y,
+                w: panel.w,
+                h: panel.h,
+              }}
+            >
               <PanelRegistry panel={panel} />
             </div>
           ))}

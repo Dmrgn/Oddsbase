@@ -612,13 +612,15 @@ export const backendInterface = {
     },
 
     sendObservation: (
-      results: Array<{ command: string; status: string; result?: string; panelId?: string }>
+      results: Array<{ command: string; status: string; result?: string; panelId?: string }>,
+      currentPanels?: Array<{ id: string; type: string; data: Record<string, unknown> }>
     ): void => {
       const socket = getAgentSocket();
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({
           op: "agent_observation",
           results,
+          current_panels: currentPanels,
         }));
       }
     },

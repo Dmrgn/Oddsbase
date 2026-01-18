@@ -6,6 +6,7 @@
 import { backendInterface } from "@/backendInterface";
 import { COMMANDS, executeCommand, getCommandEntries } from "./registry";
 import { useAgentStore, type AgentStep, type ExecutedAction } from "@/hooks/useAgentStore";
+import { useWorkspaceStore } from "@/hooks/useWorkspaceStore";
 
 export const agentController = {
   runWorkflow: (prompt: string) => {
@@ -125,9 +126,18 @@ export const agentController = {
               }
             }
 
+            // Capture current panel state for context
+            const workspaceState = useWorkspaceStore.getState();
+            const currentPanels = workspaceState.panels
+              .filter(p => p.isVisible)
+              .map(p => ({
+                id: p.id,
+                type: p.type,
+                data: p.data,
+              }));
 
-            // Send observations back
-            backendInterface.socket.sendObservation(results);
+            // Send observations back with panel context
+            backendInterface.socket.sendObservation(results, currentPanels);
           }
         },
 

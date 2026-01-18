@@ -7,6 +7,8 @@ import { ResearcherPanel } from "@/components/dashboard/ResearcherPanel";
 import { useUIStore } from "@/hooks/useUIStore";
 import { Kbd } from "./components/ui/kbd";
 
+import logo from "./OddsBaseLogo.webp";
+
 import {
   Sidebar,
   SidebarContent,
@@ -42,8 +44,7 @@ function AppContent() {
     <>
       <header className="grid grid-cols-3 border-b border-border bg-card px-6 py-4">
         <div>
-          <div className="text-sm text-muted-foreground">Prediction Market Dashboard</div>
-          <div className="text-xl font-semibold">Workspace</div>
+          <img className="max-h-10" src={logo}></img>
         </div>
         <div className="flex items-center gap-3 w-full justify-center">
           <Kbd>⌘ ⇧ P</Kbd>
