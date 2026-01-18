@@ -883,6 +883,7 @@ export function CommandPalette() {
             };
             handleSubPaletteSelect(option);
           }}
+          suggestedMarkets={subPalette.suggestedOptions}
           autoClose={false}
         />
       ) : subPalette.open && (
