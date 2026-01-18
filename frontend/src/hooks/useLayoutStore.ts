@@ -35,6 +35,8 @@ interface LayoutState {
 const PANEL_DEFAULTS_MAP: Record<PanelType, { w: number; h: number; minW: number; minH: number }> = {
     NEWS_FEED: { w: 4, h: 6, minW: 3, minH: 4 },
     MARKET_AGGREGATOR_GRAPH: { w: 6, h: 8, minW: 4, minH: 5 },
+    CHART: { w: 6, h: 8, minW: 4, minH: 5 },
+    ORDER_BOOK: { w: 4, h: 6, minW: 3, minH: 4 },
 };
 
 export const useLayoutStore = create<LayoutState>()(

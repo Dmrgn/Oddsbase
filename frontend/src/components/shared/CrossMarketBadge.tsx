@@ -83,55 +83,55 @@ export function CrossMarketBadge({ marketId, onNavigate }: CrossMarketBadgeProps
             {/* Badge */}
             <button
                 onClick={() => onNavigate?.(similar_market.market_id)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-blue-300 bg-blue-900/40 hover:bg-blue-900/60 border border-blue-700/50 rounded-full transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-primary bg-primary/10 hover:bg-primary/20 border border-primary/30 rounded-full transition-all cursor-pointer"
             >
                 <span>{platformEmoji}</span>
                 <span>Similar on {platformName}</span>
                 {method === "embedding" && scorePercent > 0 && (
-                    <span className="text-blue-400/70">{scorePercent}%</span>
+                    <span className="text-primary/70">{scorePercent}%</span>
                 )}
             </button>
 
             {/* Hover Tooltip */}
             {isHovered && (
-                <div className="absolute z-50 w-96 p-3 mt-2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl left-0 top-full">
+                <div className="absolute z-50 w-96 p-3 mt-2 bg-popover border border-border rounded-lg shadow-xl left-0 top-full">
                     <div className="space-y-4">
                         {/* Source Market */}
                         <div>
-                            <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
                                 Current Market
                             </div>
-                            <div className="text-sm text-gray-200 line-clamp-2">
+                            <div className="text-sm text-foreground line-clamp-2">
                                 {comparison.source_market.title}
                             </div>
                         </div>
 
                         {/* Divider */}
-                        <div className="h-px bg-gray-800" />
+                        <div className="h-px bg-border" />
 
                         {/* Similar Markets List */}
                         <div>
-                            <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-2 flex items-center justify-between">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center justify-between">
                                 <span>Related Bets</span>
-                                <span className="text-[9px] text-gray-600">Click arrow to branch</span>
+                                <span className="text-[9px] text-muted-foreground/60">Click arrow to branch</span>
                             </div>
 
                             <div className="space-y-1">
                                 {(similar_markets || [similar_market]).slice(0, 4).map((market) => (
                                     <div
                                         key={market.market_id}
-                                        className="group flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-blue-900/30 transition-all border border-transparent hover:border-blue-700/40"
+                                        className="group flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-accent transition-all border border-transparent hover:border-border"
                                         onClick={() => onNavigate?.(market.market_id)}
                                     >
                                         <div className="text-sm shrink-0">
                                             {market.source === "kalshi" ? "🔷" : "🟣"}
                                         </div>
                                         <div className="flex-1 min-w-0">
-                                            <div className="text-sm text-blue-200 line-clamp-2 group-hover:text-white transition-colors">
+                                            <div className="text-sm text-primary line-clamp-2 group-hover:text-primary/80 transition-colors">
                                                 {market.title}
                                             </div>
                                             {'score' in market && (market as any).score && (
-                                                <div className="mt-1 text-[10px] text-gray-500">
+                                                <div className="mt-1 text-[10px] text-muted-foreground">
                                                     {Math.round((market as any).score * 100)}% match
                                                 </div>
                                             )}
@@ -140,7 +140,7 @@ export function CrossMarketBadge({ marketId, onNavigate }: CrossMarketBadgeProps
                                         {/* Branch Button - always visible */}
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleBranch(market.market_id, e); }}
-                                            className="shrink-0 p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded-md transition-all"
+                                            className="shrink-0 p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-all"
                                             title="Open in new chart"
                                         >
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -153,7 +153,7 @@ export function CrossMarketBadge({ marketId, onNavigate }: CrossMarketBadgeProps
                         </div>
 
                         {/* Footer Info */}
-                        <div className="text-[10px] text-gray-600 pt-2 border-t border-gray-800 flex justify-between">
+                        <div className="text-[10px] text-muted-foreground/60 pt-2 border-t border-border flex justify-between">
                             <span>Matched via {method === "embedding" ? "semantic embedding" : "text similarity"}</span>
                         </div>
                     </div>

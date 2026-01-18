@@ -4,7 +4,6 @@ import { DashboardGrid } from "@/components/dashboard/DashboardGrid";
 import { CommandPalette } from "@/components/dashboard/CommandPalette";
 import { AgentStatus } from "@/components/dashboard/AgentStatus";
 import { ResearcherPanel } from "@/components/dashboard/ResearcherPanel";
-import { useWorkspaceStore, type PanelInstance } from "@/hooks/useWorkspaceStore";
 import { useUIStore } from "@/hooks/useUIStore";
 import { Kbd } from "./components/ui/kbd";
 
@@ -12,7 +11,6 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
   SidebarHeader,
   SidebarProvider,
   SidebarTrigger,
@@ -20,14 +18,8 @@ import {
 } from "@/components/ui/sidebar"
 
 function AppContent() {
-  const panels = useWorkspaceStore((state: { panels: PanelInstance[] }) => state.panels);
-  const openPanel = useWorkspaceStore(
-    (state: { openPanel: (type: PanelInstance["type"], data?: Record<string, unknown>) => string }) =>
-      state.openPanel
-  );
-
-  const { openCommandPalette, closeCommandPalette, isCommandPaletteOpen, isSidebarOpen, setSidebarOpen } = useUIStore();
-  const { open } = useSidebar();
+  const { openCommandPalette, closeCommandPalette, isCommandPaletteOpen } = useUIStore();
+  const { open: sidebarOpen } = useSidebar();
   const [sidebarTab, setSidebarTab] = useState<"agent" | "research">("research");
 
   useEffect(() => {
@@ -48,9 +40,7 @@ function AppContent() {
 
   return (
     <>
-      <header
-        className="grid grid-cols-3 border-b border-border bg-card px-6 py-4"
-      >
+      <header className="grid grid-cols-3 border-b border-border bg-card px-6 py-4">
         <div>
           <div className="text-sm text-muted-foreground">Prediction Market Dashboard</div>
           <div className="text-xl font-semibold">Workspace</div>
@@ -59,14 +49,15 @@ function AppContent() {
           <Kbd>⌘ ⇧ P</Kbd>
           <span>Command Palette</span>
         </div>
-        <div className="w-full flex justify-end items-center transition-[padding] duration-200 ease-linear" style={{
-          paddingRight: open ? 'calc(var(--sidebar-width) + 0rem)' : '0rem'
-        }}>
+        <div className="w-full flex justify-end items-center">
           <SidebarTrigger />
         </div>
       </header>
 
-      <main className="flex flex-1 overflow-hidden max-h-[90vh]">
+      <main
+        className="flex flex-1 overflow-hidden max-h-[90vh] transition-[margin] duration-200 ease-linear"
+        style={{ marginRight: sidebarOpen ? 'var(--sidebar-width)' : '0' }}
+      >
         <section className="flex-1 overflow-y-auto p-4">
           <DashboardGrid />
         </section>
@@ -78,8 +69,8 @@ function AppContent() {
             <button
               onClick={() => setSidebarTab("research")}
               className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${sidebarTab === "research"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               Research
@@ -87,8 +78,8 @@ function AppContent() {
             <button
               onClick={() => setSidebarTab("agent")}
               className={`flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${sidebarTab === "agent"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               Agent
@@ -99,7 +90,9 @@ function AppContent() {
           {sidebarTab === "agent" && <AgentStatus />}
           {sidebarTab === "research" && <ResearcherPanel />}
         </SidebarContent>
-        <SidebarFooter />
+        <SidebarFooter className="p-2 border-t border-sidebar-border">
+          <SidebarTrigger className="w-full justify-center" />
+        </SidebarFooter>
       </Sidebar>
 
       <CommandPalette />
