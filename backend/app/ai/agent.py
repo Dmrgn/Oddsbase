@@ -39,7 +39,7 @@ class AgentService:
             # Create new assistant
             assistant = await self.client.create_assistant(
                 name="Dashboard Assistant",
-                system_prompt="A helpful assistant"
+                description="You only respond in poetry."
             )
             self.assistant_id = assistant.assistant_id
             print(f"[AgentService] Created new assistant: {self.assistant_id}")
