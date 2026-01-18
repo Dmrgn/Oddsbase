@@ -11,10 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWorkspaceStore, type PanelInstance, type PanelType } from "@/hooks/useWorkspaceStore";
 import { useUIStore } from "@/hooks/useUIStore";
 import { getPanelActions, type ActionContext } from "./PanelActions";
+import { PanelMenu } from "./PanelMenu";
 
 interface PanelWrapperProps {
   panel: PanelInstance;
   children: ReactNode;
+  hideHeader?: boolean;
 }
 
 const panelCommandMap: Partial<Record<PanelType, string>> = {
@@ -41,7 +43,7 @@ const extractPanelParams = (panel: PanelInstance): Record<string, string> => {
   }
 };
 
-export function PanelWrapper({ panel, children }: PanelWrapperProps) {
+export function PanelWrapper({ panel, children, hideHeader = false }: PanelWrapperProps) {
   const { closePanel, openPanel, updatePanel } = useWorkspaceStore();
   const { openCommandPalette } = useUIStore();
 
@@ -80,51 +82,12 @@ export function PanelWrapper({ panel, children }: PanelWrapperProps) {
 
   return (
     <Card className="flex h-full flex-col">
-      <CardHeader className="flex flex-row items-center justify-between gap-3">
-        <CardTitle>{String(panel.data.title ?? "Untitled Panel")}</CardTitle>
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger className="rounded-md p-1 text-muted-foreground hover:bg-muted">
-              <MoreHorizontal className="h-4 w-4" />
-              <span className="sr-only">Panel actions</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {/* Panel-specific actions */}
-              {panelActions.map((action) => (
-                <DropdownMenuItem
-                  key={action.id}
-                  onClick={() => handleAction(action)}
-                  disabled={action.isDisabled?.(panel)}
-                >
-                  {action.icon && <action.icon className="mr-2 h-4 w-4" />}
-                  {action.label}
-                  {action.shortcut && (
-                    <span className="ml-auto text-xs text-muted-foreground">
-                      {action.shortcut}
-                    </span>
-                  )}
-                </DropdownMenuItem>
-              ))}
-
-              {/* Separator if there are panel-specific actions */}
-              {panelActions.length > 0 && <DropdownMenuSeparator />}
-
-              {/* Common actions */}
-              <DropdownMenuItem onClick={handleEdit}>Edit</DropdownMenuItem>
-              <DropdownMenuItem onClick={handleDelete} variant="destructive">
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <button
-            type="button"
-            className="panel-drag-handle rounded-md p-1 text-muted-foreground hover:bg-muted"
-            aria-label="Drag panel"
-          >
-            <GripVertical className="h-4 w-4" />
-          </button>
-        </div>
-      </CardHeader>
+      {!hideHeader && (
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <CardTitle>{String(panel.data.title ?? "Untitled Panel")}</CardTitle>
+          <PanelMenu panel={panel} />
+        </CardHeader>
+      )}
       <CardContent className="min-h-0 flex-1 overflow-hidden">
         {children}
       </CardContent>

@@ -6,6 +6,7 @@
 import type { PanelType } from "@/hooks/useWorkspaceStore";
 import { useWorkspaceStore } from "@/hooks/useWorkspaceStore";
 import { useLayoutStore } from "@/hooks/useLayoutStore";
+import { backendInterface } from "@/backendInterface";
 
 export const COMMANDS = {
   OPEN_PANEL: "OPEN_PANEL",
@@ -24,7 +25,7 @@ export type CommandType = keyof typeof COMMANDS;
 export type CommandPayloads =
   | { type: "OPEN_PANEL"; data: { panelType: PanelType; panelData?: Record<string, unknown> } }
   | { type: "CLOSE_PANEL"; data: { id: string } }
-  | { type: "QUERY_MARKET"; data: { marketId: string } }
+  | { type: "QUERY_MARKET"; data: { marketId: string; title?: string } }
   | { type: "RUN_AI"; data: { prompt: string } }
   | { type: "OPTIMIZE_LAYOUT"; data: Record<string, never> }
   | { type: "SAVE_LAYOUT"; data: { name: string } }
@@ -72,10 +73,10 @@ export const executeCommand = (type: CommandType, data: CommandPayloads["data"])
       break;
     }
     case COMMANDS.QUERY_MARKET: {
-      const payload = data as CommandPayloads["data"] & { marketId: string };
+      const payload = data as CommandPayloads["data"] & { marketId: string; title?: string };
       store.openPanel("CHART", { marketId: payload.marketId });
       store.openPanel("ORDER_BOOK", { marketId: payload.marketId });
-      store.openPanel("NEWS_FEED", { query: payload.marketId });
+      store.openPanel("NEWS_FEED", { query: payload.title || payload.marketId });
       break;
     }
     case COMMANDS.OPTIMIZE_LAYOUT: {
@@ -200,10 +201,20 @@ export const getCommandEntries = (
           defaultValue: "",
         },
       ],
-      handler: (values) =>
+      handler: async (values) => {
+        const marketId = values.marketId || "demo-market";
+        let title = marketId;
+        try {
+          const market = await backendInterface.fetchMarket(marketId);
+          title = market.title;
+        } catch (error) {
+          console.error("Failed to fetch market title for command:", error);
+        }
         executeCommand(COMMANDS.QUERY_MARKET, {
-          marketId: values.marketId || "demo-market",
-        }),
+          marketId,
+          title,
+        });
+      },
     },
     {
       id: "ai-run-agent",

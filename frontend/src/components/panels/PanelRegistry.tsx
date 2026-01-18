@@ -16,19 +16,19 @@ export function PanelRegistry({ panel }: PanelRegistryProps) {
     case "CHART":
     case "MARKET_AGGREGATOR_GRAPH": // Backward compatibility
       return (
-        <PanelWrapper panel={panel}>
+        <PanelWrapper panel={panel} hideHeader={true}>
           <ChartPanel panel={panel} />
         </PanelWrapper>
       );
     case "ORDER_BOOK":
       return (
-        <PanelWrapper panel={panel}>
+        <PanelWrapper panel={panel} hideHeader={true}>
           <OrderBookPanel panel={panel} />
         </PanelWrapper>
       );
     case "NEWS_FEED":
       return (
-        <PanelWrapper panel={panel}>
+        <PanelWrapper panel={panel} hideHeader={true}>
           <NewsFeedPanel panel={panel} />
         </PanelWrapper>
       );

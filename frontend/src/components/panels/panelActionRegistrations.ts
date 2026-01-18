@@ -16,6 +16,7 @@ import {
     Copy,
     RefreshCw
 } from "lucide-react";
+import { backendInterface } from "@/backendInterface";
 
 // ============================================
 // CHART Panel Actions
@@ -25,9 +26,22 @@ registerPanelActions("CHART", [
         id: "open-news",
         label: "View Related News",
         icon: Newspaper,
-        handler: (panel, ctx) => {
+        handler: async (panel, ctx) => {
             // Extract keywords from market title for news search
-            const marketTitle = String(panel.data.title || "market");
+            let marketTitle = String(panel.data.title || "market");
+
+            // If title is generic and we have a marketId, fetch the real title
+            if ((!marketTitle || marketTitle === "Chart" || marketTitle === "Super Chart") && panel.data.marketId && panel.data.marketId !== "demo-market") {
+                try {
+                    const market = await backendInterface.fetchMarket(String(panel.data.marketId));
+                    marketTitle = market.title;
+                    // Optionally update the panel title so we don't need to fetch next time
+                    ctx.updatePanel(panel.id, { title: market.title });
+                } catch (e) {
+                    console.error("Failed to fetch market for news context", e);
+                }
+            }
+
             const keywords = marketTitle.split(/\s+/).slice(0, 4).join(" ");
 
             ctx.openPanel("NEWS_FEED", {
@@ -98,8 +112,20 @@ registerPanelActions("ORDER_BOOK", [
         id: "open-news",
         label: "View Related News",
         icon: Newspaper,
-        handler: (panel, ctx) => {
-            const marketTitle = String(panel.data.title || "market");
+        handler: async (panel, ctx) => {
+            let marketTitle = String(panel.data.title || "market");
+
+            // If title is generic and we have a marketId, fetch the real title
+            if ((!marketTitle || marketTitle === "Order Book") && panel.data.marketId && panel.data.marketId !== "demo-market") {
+                try {
+                    const market = await backendInterface.fetchMarket(String(panel.data.marketId));
+                    marketTitle = market.title;
+                    ctx.updatePanel(panel.id, { title: marketTitle });
+                } catch (e) {
+                    console.error("Failed to fetch market for news context", e);
+                }
+            }
+
             const keywords = marketTitle.split(/\s+/).slice(0, 4).join(" ");
 
             ctx.openPanel("NEWS_FEED", {
@@ -112,7 +138,7 @@ registerPanelActions("ORDER_BOOK", [
         id: "copy-market-id",
         label: "Copy Market ID",
         icon: Copy,
-        handler: (panel) => {
+        handler: (panel, ctx) => {
             const marketId = String(panel.data.marketId || "");
             navigator.clipboard.writeText(marketId).catch(console.error);
         },
@@ -138,8 +164,8 @@ registerPanelActions("NEWS_FEED", [
         id: "open-in-browser",
         label: "Search on Google News",
         icon: ExternalLink,
-        handler: (panel) => {
-            const query = encodeURIComponent(String(panel.data.query || ""));
+        handler: (panelInstance) => {
+            const query = encodeURIComponent(String(panelInstance.data.query || ""));
             window.open(`https://news.google.com/search?q=${query}`, "_blank");
         },
         isVisible: (panel) => !!panel.data.query,
@@ -154,8 +180,20 @@ registerPanelActions("MARKET_AGGREGATOR_GRAPH", [
         id: "open-news",
         label: "View Related News",
         icon: Newspaper,
-        handler: (panel, ctx) => {
-            const marketTitle = String(panel.data.title || "market");
+        handler: async (panel, ctx) => {
+            let marketTitle = String(panel.data.title || "market");
+
+            // Fetch real title if generic
+            if ((!marketTitle || marketTitle === "Market Graph") && panel.data.marketId) {
+                try {
+                    const market = await backendInterface.fetchMarket(String(panel.data.marketId));
+                    marketTitle = market.title;
+                    ctx.updatePanel(panel.id, { title: marketTitle });
+                } catch (e) {
+                    console.error("Failed to fetch market for news context", e);
+                }
+            }
+
             const keywords = marketTitle.split(/\s+/).slice(0, 4).join(" ");
 
             ctx.openPanel("NEWS_FEED", {
