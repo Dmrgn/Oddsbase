@@ -300,11 +300,11 @@ class AgentService:
         from ..search_helper import search_markets
         
         all_markets = []
-        for keyword in keywords[:3]:  # Max 3 keywords
+        for keyword in keywords[:8]:  # Max 3 keywords
             markets, total, facets = search_markets(
                 state=state_manager,
                 q=keyword,
-                limit=3,  # Max 3 per keyword
+                limit=5,  # Max 3 per keyword
             )
             all_markets.extend(markets)
         
@@ -317,7 +317,7 @@ class AgentService:
                 unique_markets.append(m)
         
         # Cap at 10 total markets
-        unique_markets = unique_markets[:10]
+        unique_markets = unique_markets[:15]
         
         if not unique_markets:
             return ""
@@ -354,9 +354,9 @@ class AgentService:
             f"{context}\n"
             f"{current_params_block}"
             "For each parameter, suggest:\n"
-            "1. If type is 'market': Provide a list of 2-3 relevant market IDs with "
-            "titles and reasoning\n"
-            "2. If type is 'text' or 'select': Provide a single suggested value\n\n"
+            "1. If type is 'market' and there is enough data: Provide a list of 2-3 relevant market IDs with "
+            "titles and reasoning. Only use market IDs that are in the \n"
+            "2. If type is 'text' or 'select' and there is enough data: Provide a single suggested value\n\n"
             "Respond in JSON format:\n"
             "{\n"
             "  \"paramName\": {\n"
