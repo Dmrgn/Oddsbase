@@ -560,6 +560,17 @@ export function CommandPalette() {
         ? paramSuggestion.options ?? []
         : [];
 
+    if (DEBUG_AGENT) {
+      console.debug("[Sub-Palette] Opening for param", {
+        paramName: param.name,
+        paramType: param.type,
+        hasSuggestion: !!paramSuggestion,
+        suggestionType: paramSuggestion?.type,
+        suggestedOptionsCount: suggestedOptions.length,
+        suggestedOptions,
+      });
+    }
+
     setSubPalette({
       open: true,
       type: param.type,
@@ -863,6 +874,7 @@ export function CommandPalette() {
               handleSubPaletteSelect(option);
             }}
             autoClose={false}
+            suggestedMarkets={subPalette.suggestedOptions}
           />
         ) : subPalette.open && (
           <div
