@@ -215,7 +215,6 @@ export function ChartPanel({ panel }: ChartPanelProps) {
   }, [outcomes]);
 
   const sourceLabel = market?.source ? market.source.toUpperCase() : null;
-  const hasHistoricalData = Object.values(history).some(h => h.length > 0);
 
   return (
     <div className="flex flex-col h-full min-h-0 bg-background overflow-hidden relative">
@@ -358,9 +357,6 @@ export function ChartPanel({ panel }: ChartPanelProps) {
             <span className="truncate">
               Updated: {lastUpdate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </span>
-          )}
-          {hasHistoricalData && (
-            <span className="text-emerald-500 shrink-0">● Historical</span>
           )}
         </div>
 

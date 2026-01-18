@@ -8,6 +8,8 @@ import { agentController } from "@/commands/agentController";
 import { useUIStore } from "@/hooks/useUIStore";
 import { useAgentStore } from "@/hooks/useAgentStore";
 
+const DEBUG_AGENT = true;
+
 type FocusMode = "list" | "param" | "run";
 
 type SubPaletteType = "market" | "select";
@@ -18,6 +20,22 @@ type SubPaletteOption = {
   description?: string;
 };
 
+type ParamSuggestion = {
+  paramName: string;
+  type: "direct" | "market_list";
+  value?: string;
+  options?: SubPaletteOption[];
+  reasoning?: string;
+};
+
+type SuggestionState = {
+  loading: boolean;
+  commandId: string | null;
+  suggestions: ParamSuggestion[];
+  error?: string;
+  requestId?: string;
+};
+
 type SubPaletteState = {
   open: boolean;
   type: SubPaletteType | null;
@@ -25,6 +43,7 @@ type SubPaletteState = {
   query: string;
   options: SubPaletteOption[];
   baseOptions: SubPaletteOption[];
+  suggestedOptions?: SubPaletteOption[];
   loading: boolean;
   emptyMessage: string;
   paramName: string;
@@ -57,6 +76,18 @@ export function CommandPalette() {
   const [search, setSearch] = useState("");
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [agentCommandRan, setAgentCommandRan] = useState(false);
+  const [suggestions, setSuggestions] = useState<SuggestionState>({
+    loading: false,
+    commandId: null,
+    suggestions: [],
+  });
+  const [userModifiedParams, setUserModifiedParams] = useState<Set<string>>(new Set());
+  const [agentSocket, setAgentSocket] = useState<WebSocket | null>(null);
+
+  const suggestionTimeoutRef = useRef<number | null>(null);
+  const currentRequestIdRef = useRef<string | null>(null);
+  const debounceRef = useRef<number | null>(null);
+  const pendingAgentMessagesRef = useRef<string[]>([]);
 
   // State for selection & focus
   const [selectedValue, setSelectedValue] = useState<string>("");
@@ -72,7 +103,6 @@ export function CommandPalette() {
   const paramRefs = useRef<(HTMLInputElement | null)[]>([]);
   const runButtonRef = useRef<HTMLButtonElement | null>(null);
   const subPaletteInputRef = useRef<HTMLInputElement | null>(null);
-  const debounceRef = useRef<number | null>(null);
 
   const entries = useMemo(
     () =>
@@ -85,6 +115,63 @@ export function CommandPalette() {
   );
 
   const commandMap = useMemo(() => new Map(entries.map((entry) => [entry.id, entry])), [entries]);
+
+  useEffect(() => {
+    const socket = backendInterface.socket.createAgentSocket();
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (DEBUG_AGENT) {
+          console.debug("[Agent WS] inbound", data);
+        }
+        if (data.type === "param_suggestions") {
+          handleParamSuggestions(data);
+        } else if (data.type === "execution_tracked") {
+          setSuggestions((prev) => ({
+            ...prev,
+            loading: false,
+          }));
+        }
+      } catch (error) {
+        console.error("Agent WebSocket message error", error);
+      }
+    };
+
+    const handleClose = () => {
+      if (DEBUG_AGENT) {
+        console.debug("[Agent WS] closed");
+      }
+      setAgentSocket(null);
+    };
+
+    const handleOpen = () => {
+      if (DEBUG_AGENT) {
+        console.debug("[Agent WS] open");
+      }
+    };
+
+    const handleError = () => {
+      if (DEBUG_AGENT) {
+        console.debug("[Agent WS] error");
+      }
+      socket.close();
+    };
+
+    socket.addEventListener("message", handleMessage);
+    socket.addEventListener("close", handleClose);
+    socket.addEventListener("open", handleOpen);
+    socket.addEventListener("error", handleError);
+
+    setAgentSocket(socket);
+
+    return () => {
+      socket.removeEventListener("message", handleMessage);
+      socket.removeEventListener("close", handleClose);
+      socket.removeEventListener("open", handleOpen);
+      socket.removeEventListener("error", handleError);
+    };
+  }, []);
 
   // Handle initial store values when opening
   useEffect(() => {
@@ -149,11 +236,154 @@ export function CommandPalette() {
     return subPalette.options;
   }, [subPalette]);
 
+  const handleParamSuggestions = (data: {
+    command_id: string;
+    request_id?: string;
+    suggestions: Record<string, {
+      type: "direct" | "market_list";
+      value?: string;
+      options?: Array<{
+        value: string;
+        label: string;
+        description?: string;
+        reason?: string;
+      }>;
+      reasoning?: string;
+    }>;
+  }) => {
+    setSuggestions((prev) => {
+      if (data.request_id && prev.requestId !== data.request_id) {
+        return prev;
+      }
+
+      const suggestionList: ParamSuggestion[] = Object.entries(data.suggestions).map(
+        ([paramName, suggestion]) => ({
+          paramName,
+          type: suggestion.type,
+          value: suggestion.value,
+          options: suggestion.options?.map((option) => ({
+            value: option.value,
+            label: option.label,
+            description: option.description ?? option.reason,
+          })),
+          reasoning: suggestion.reasoning,
+        })
+      );
+
+      return {
+        loading: false,
+        commandId: data.command_id,
+        suggestions: suggestionList,
+        requestId: prev.requestId,
+      };
+    });
+
+    if (DEBUG_AGENT) {
+      console.debug("[Agent Suggestions]", data.suggestions);
+    }
+
+    applyDirectSuggestions(data.suggestions);
+  };
+
+  const applyDirectSuggestions = (
+    suggestionData: Record<string, { type: string; value?: string }>
+  ) => {
+    setParamValues((prev) => {
+      const updated = { ...prev };
+
+      for (const [paramName, suggestion] of Object.entries(suggestionData)) {
+        if (
+          suggestion.type === "direct" &&
+          suggestion.value &&
+          !userModifiedParams.has(paramName) &&
+          (!prev[paramName] || prev[paramName] === "")
+        ) {
+          updated[paramName] = suggestion.value;
+        }
+      }
+
+      if (DEBUG_AGENT) {
+        console.debug("[Agent Suggestions] applied", updated);
+      }
+
+      return updated;
+    });
+  };
+
+  const requestSuggestions = (commandId: string, params: CommandParamSchema[]) => {
+    if (!agentSocket || agentSocket.readyState !== WebSocket.OPEN) {
+      if (DEBUG_AGENT) {
+        console.debug("[Agent WS] socket not open", agentSocket?.readyState);
+      }
+      setSuggestions((prev) => ({ ...prev, loading: false }));
+      return;
+    }
+
+    const requestId = `${commandId}-${Date.now()}`;
+    currentRequestIdRef.current = requestId;
+
+    setSuggestions((prev) => ({
+      ...prev,
+      loading: true,
+      commandId,
+      requestId,
+      error: undefined,
+    }));
+
+    if (suggestionTimeoutRef.current) {
+      window.clearTimeout(suggestionTimeoutRef.current);
+    }
+
+    suggestionTimeoutRef.current = window.setTimeout(() => {
+      setSuggestions((prev) => {
+        if (prev.requestId === requestId && prev.loading) {
+          return { ...prev, loading: false, error: "Timeout" };
+        }
+        return prev;
+      });
+    }, 3000);
+
+    const payload = {
+      op: "agent_suggest_params",
+      command_id: commandId,
+      params: params.map((param) => ({ name: param.name, type: param.type })),
+      current_params: paramValues,
+      request_id: requestId,
+    };
+
+    if (DEBUG_AGENT) {
+      console.debug("[Agent WS] outbound", payload);
+    }
+
+    agentSocket.send(JSON.stringify(payload));
+  };
+
+  useEffect(() => {
+    if (DEBUG_AGENT) {
+      console.debug("[Agent Trigger]", {
+        focusMode,
+        activeEntry: activeEntry?.id,
+        params: activeEntry?.params?.length ?? 0,
+        socketReadyState: agentSocket?.readyState,
+      });
+    }
+
+    if (!activeEntry || focusMode !== "list") return;
+
+    if (!activeEntry.params || activeEntry.params.length === 0) {
+      setSuggestions({ loading: false, commandId: null, suggestions: [] });
+      return;
+    }
+
+    requestSuggestions(activeEntry.id, activeEntry.params);
+  }, [activeEntry?.id, focusMode, agentSocket]);
+
   // When activeEntry changes, reset param values (unless we are deep in editing logic, but usually switching command = reset)
   useEffect(() => {
     if (focusMode === "list") {
       setParamValues(buildInitialValues(activeEntry?.params));
       setActiveParamIndex(0);
+      setUserModifiedParams(new Set());
     }
   }, [activeEntry, focusMode]);
 
@@ -283,6 +513,15 @@ export function CommandPalette() {
         ? (param.options ?? []).map((option) => ({ value: option, label: option }))
         : [];
 
+    const paramSuggestion = suggestions.suggestions.find(
+      (suggestion) => suggestion.paramName === param.name
+    );
+
+    const suggestedOptions =
+      param.type === "market" && paramSuggestion?.type === "market_list"
+        ? paramSuggestion.options ?? []
+        : [];
+
     setSubPalette({
       open: true,
       type: param.type,
@@ -290,6 +529,7 @@ export function CommandPalette() {
       query: "",
       options: [],
       baseOptions,
+      suggestedOptions,
       loading: false,
       emptyMessage: param.type === "market" ? "Type at least 2 characters" : "No options",
       paramName: param.name,
@@ -301,6 +541,21 @@ export function CommandPalette() {
   const handleRun = () => {
     if (!activeEntry) return;
     activeEntry.handler(paramValues);
+
+    if (agentSocket?.readyState === WebSocket.OPEN) {
+      const payload = {
+        op: "agent_track_execution",
+        command_id: activeEntry.id,
+        params: paramValues,
+        timestamp: new Date().toISOString(),
+      };
+
+      if (DEBUG_AGENT) {
+        console.debug("[Agent WS] outbound", payload);
+      }
+
+      agentSocket.send(JSON.stringify(payload));
+    }
 
     const shouldClose = activeEntry.closeOnRun !== false;
     if (shouldClose) {
@@ -510,6 +765,7 @@ export function CommandPalette() {
                                   ...prev,
                                   [param.name]: event.target.value,
                                 }));
+                                setUserModifiedParams((prev) => new Set(prev).add(param.name));
                               }}
                             />
                           </label>
@@ -576,6 +832,33 @@ export function CommandPalette() {
                 </div>
               </div>
               <div className="max-h-64 overflow-y-auto p-2">
+                {!subPalette.query.trim() &&
+                  subPalette.suggestedOptions &&
+                  subPalette.suggestedOptions.length > 0 && (
+                    <>
+                      <div className="px-3 py-2 text-xs font-medium text-muted-foreground">✨ Suggested</div>
+                      <div className="space-y-1 mb-2">
+                        {subPalette.suggestedOptions.map((option, index) => (
+                          <button
+                            key={`suggested-${option.value}`}
+                            type="button"
+                            onClick={() => handleSubPaletteSelect(option)}
+                            className={`w-full rounded-lg px-3 py-2 text-left text-sm transition ${
+                              index === subPaletteIndex ? "bg-muted" : "hover:bg-muted"
+                            }`}
+                          >
+                            <div className="font-medium text-foreground">{option.label}</div>
+                            {option.description && (
+                              <div className="text-xs text-muted-foreground">{option.description}</div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                      {filteredSubPaletteOptions.length > 0 && (
+                        <div className="border-t border-border my-2"></div>
+                      )}
+                    </>
+                  )}
                 {subPalette.loading ? (
                   <div className="p-4 text-sm text-muted-foreground">Searching…</div>
                 ) : filteredSubPaletteOptions.length === 0 ? (
