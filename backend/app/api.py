@@ -12,7 +12,7 @@ from .state import StateManager
 from .schemas import Market, OrderBook, QuotePoint, Event, EventSearchResult
 from .news.fetcher import news_fetcher  # type: ignore
 from .news.rank import rank_articles
-from .services.command_history import CommandHistoryManager
+from .search_helper import search_markets as search_markets_helper
 
 DEBUG_WS = True
 
@@ -471,13 +471,13 @@ async def websocket_endpoint(websocket: WebSocket):
     # Agent state for this connection
     current_thread_id = None
 
-    # Command history for this connection
-    command_history = CommandHistoryManager(max_size=50)
+    # Caching and rate limiting for suggestions
     suggestion_cache = SuggestionCache(ttl_seconds=30)
     rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
     
-    # Get agent service from app state
+    # Get services from app state
     agent_service = getattr(websocket.app.state, "agent", None)
+    llm_service = getattr(websocket.app.state, "llm", None)
     
     try:
         while True:
@@ -569,11 +569,32 @@ async def websocket_endpoint(websocket: WebSocket):
                     timestamp = data.get("timestamp")
 
                     if command_id:
-                        command_history.track_execution(
-                            command_id=command_id,
-                            params=params,
-                            timestamp=timestamp,
-                        )
+                        # Track in LLMService (for param suggestions)
+                        if llm_service:
+                            await llm_service.track_execution(
+                                command_id=command_id,
+                                params=params,
+                                timestamp=timestamp,
+                                state_manager=state,
+                            )
+                        
+                        # Also track in AgentService (for chat context)
+                        if agent_service:
+                            # Ensure thread exists
+                            if not current_thread_id:
+                                if not agent_service.assistant_id:
+                                    await agent_service.initialize()
+                                thread = await agent_service.create_thread()
+                                current_thread_id = thread.thread_id
+                            
+                            # Send to agent to store in memory with market enrichment
+                            await agent_service.track_execution(
+                                thread_id=current_thread_id,
+                                command_id=command_id,
+                                params=params,
+                                timestamp=timestamp,
+                                state_manager=state,
+                            )
 
                         if DEBUG_WS:
                             print(
@@ -589,10 +610,10 @@ async def websocket_endpoint(websocket: WebSocket):
                     print(f"[WebSocket] Error tracking execution: {e}")
 
             elif op == "agent_suggest_params":
-                if not agent_service:
+                if not llm_service:
                     await websocket.send_json({
                         "type": "error",
-                        "error": "Agent service not available",
+                        "error": "LLM service not available",
                         "request_id": data.get("request_id"),
                     })
                     continue
@@ -632,27 +653,16 @@ async def websocket_endpoint(websocket: WebSocket):
                         })
                         continue
 
-                    context = command_history.build_context_string(
-                        command_id=command_id,
-                        limit=10,
-                    )
-
-                    if not current_thread_id:
-                        if not agent_service.assistant_id:
-                            await agent_service.initialize()
-                        thread = await agent_service.create_thread()
-                        current_thread_id = thread.thread_id
-
                     try:
+                        # Use LLMService for parameter suggestions
                         suggestions = await asyncio.wait_for(
-                            agent_service.suggest_params(
-                                thread_id=current_thread_id,
+                            llm_service.suggest_params(
                                 command_id=command_id,
                                 params=params,
-                                context=context,
                                 current_params=current_params,
+                                state_manager=state,
                             ),
-                            timeout=100,
+                            timeout=10,  # 10 second timeout for OpenRouter
                         )
                     except asyncio.TimeoutError:
                         if DEBUG_WS:

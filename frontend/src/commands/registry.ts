@@ -176,7 +176,7 @@ export const getCommandEntries = (
           label: "Query",
           type: "text",
           placeholder: "prediction markets",
-          defaultValue: "prediction markets",
+          defaultValue: "",
         },
       ],
       handler: (values) =>
@@ -217,7 +217,7 @@ export const getCommandEntries = (
           label: "Prompt",
           type: "text",
           placeholder: "Find volatile markets and show news",
-          defaultValue: "Show me the latest market news",
+          defaultValue: "",
         },
       ],
       handler: (values) => runAi(values.prompt || "Show me the latest market news"),
