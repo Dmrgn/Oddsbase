@@ -8,6 +8,7 @@ import { agentController } from "@/commands/agentController";
 import { useUIStore } from "@/hooks/useUIStore";
 import { useAgentStore } from "@/hooks/useAgentStore";
 import { MarketSearchInput } from "@/components/shared/MarketSearchInput";
+import { Loader2, Sparkles, Check, AlertCircle } from "lucide-react";
 
 const DEBUG_AGENT = true;
 
@@ -86,6 +87,7 @@ export function CommandPalette() {
   });
   const [userModifiedParams, setUserModifiedParams] = useState<Set<string>>(new Set());
   const [agentSocket, setAgentSocket] = useState<WebSocket | null>(null);
+  const [showSuccessBriefly, setShowSuccessBriefly] = useState(false);
 
   const suggestionTimeoutRef = useRef<number | null>(null);
   const currentRequestIdRef = useRef<string | null>(null);
@@ -323,6 +325,12 @@ export function CommandPalette() {
 
       return updated;
     });
+
+    // Show success indicator briefly
+    setShowSuccessBriefly(true);
+    setTimeout(() => {
+      setShowSuccessBriefly(false);
+    }, 2000);
   };
 
   const requestSuggestions = (commandId: string, params: CommandParamSchema[]) => {
@@ -397,6 +405,7 @@ export function CommandPalette() {
       setParamValues(buildInitialValues(activeEntry?.params));
       setActiveParamIndex(0);
       setUserModifiedParams(new Set());
+      setShowSuccessBriefly(false);
     }
   }, [activeEntry, focusMode]);
 
@@ -769,10 +778,37 @@ export function CommandPalette() {
             <div className="border-l border-border p-4 bg-card/50">
               {activeEntry ? (
                 <div className="space-y-4">
-                  <div>
-                    <div className="text-sm font-semibold">{activeEntry.label}</div>
-                    {activeEntry.description && (
-                      <div className="text-xs text-muted-foreground">{activeEntry.description}</div>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold">{activeEntry.label}</div>
+                      {activeEntry.description && (
+                        <div className="text-xs text-muted-foreground">{activeEntry.description}</div>
+                      )}
+                    </div>
+                    {/* AI Suggestion Status Indicator */}
+                    {activeEntry.params && activeEntry.params.length > 0 && agentSocket?.readyState === WebSocket.OPEN && (
+                      <div className="flex-shrink-0">
+                        {suggestions.loading ? (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span>AI...</span>
+                          </div>
+                        ) : showSuccessBriefly && suggestions.suggestions.length > 0 ? (
+                          <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+                            <Check className="h-3 w-3" />
+                            <span>Ready</span>
+                          </div>
+                        ) : suggestions.error === "Timeout" ? (
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
+                            <Sparkles className="h-3 w-3" />
+                            <span className="opacity-50">—</span>
+                          </div>
+                        ) : suggestions.suggestions.length > 0 ? (
+                          <div className="flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400">
+                            <Sparkles className="h-3 w-3" />
+                          </div>
+                        ) : null}
+                      </div>
                     )}
                   </div>
 
