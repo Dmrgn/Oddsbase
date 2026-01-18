@@ -2,6 +2,9 @@ import asyncio
 import time
 import json
 import random
+import os
+from collections import deque
+from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -9,6 +12,9 @@ from .state import StateManager
 from .schemas import Market, OrderBook, QuotePoint
 from .news.fetcher import news_fetcher  # type: ignore
 from .news.rank import rank_articles
+from .services.command_history import CommandHistoryManager
+
+DEBUG_WS = True
 
 router = APIRouter()
 state = StateManager()
@@ -255,6 +261,64 @@ async def get_related_market(market_id: str):
     from .matching import find_related_market
     return find_related_market(market, all_markets)
 
+class SuggestionCache:
+    def __init__(self, ttl_seconds: int = 30):
+        self.ttl = timedelta(seconds=ttl_seconds)
+        self.cache: dict[str, tuple[dict, datetime]] = {}
+
+    def get(self, command_id: str) -> Optional[dict]:
+        entry = self.cache.get(command_id)
+        if not entry:
+            return None
+        suggestions, timestamp = entry
+        if datetime.utcnow() - timestamp > self.ttl:
+            self.cache.pop(command_id, None)
+            return None
+        return suggestions
+
+    def set(self, command_id: str, suggestions: dict) -> None:
+        self.cache[command_id] = (suggestions, datetime.utcnow())
+
+    def invalidate(self, command_id: str) -> None:
+        self.cache.pop(command_id, None)
+
+
+class RateLimiter:
+    def __init__(self, max_requests: int = 10, window_seconds: int = 60):
+        self.max_requests = max_requests
+        self.window = timedelta(seconds=window_seconds)
+        self.requests: deque[datetime] = deque()
+
+    def is_allowed(self) -> bool:
+        now = datetime.utcnow()
+        while self.requests and now - self.requests[0] > self.window:
+            self.requests.popleft()
+        if len(self.requests) >= self.max_requests:
+            return False
+        self.requests.append(now)
+        return True
+
+
+def validate_suggestion_request(data: dict) -> bool:
+    command_id = data.get("command_id")
+    if not command_id or not isinstance(command_id, str):
+        return False
+    if len(command_id) > 100:
+        return False
+
+    params = data.get("params", [])
+    if not isinstance(params, list):
+        return False
+
+    for param in params:
+        if not isinstance(param, dict):
+            return False
+        if "name" not in param or "type" not in param:
+            return False
+
+    return True
+
+
 # Simple WebSocket Manager
 class ConnectionManager:
     def __init__(self):
@@ -289,6 +353,11 @@ async def websocket_endpoint(websocket: WebSocket):
     
     # Agent state for this connection
     current_thread_id = None
+
+    # Command history for this connection
+    command_history = CommandHistoryManager(max_size=50)
+    suggestion_cache = SuggestionCache(ttl_seconds=30)
+    rate_limiter = RateLimiter(max_requests=10, window_seconds=60)
     
     # Get agent service from app state
     agent_service = getattr(websocket.app.state, "agent", None)
@@ -300,6 +369,9 @@ async def websocket_endpoint(websocket: WebSocket):
             # Or {"op": "agent_init"} or {"op": "agent_message", "content": "..."}
             data = await websocket.receive_json()
             op = data.get("op")
+
+            if DEBUG_WS:
+                print(f"[WebSocket] Received op={op} payload={data}")
             
             # ===== AGENT OPERATIONS =====
             
@@ -319,6 +391,9 @@ async def websocket_endpoint(websocket: WebSocket):
                     # Create new thread for this connection
                     thread = await agent_service.create_thread()
                     current_thread_id = thread.thread_id
+
+                    if DEBUG_WS:
+                        print(f"[WebSocket] Agent ready thread_id={current_thread_id}")
                     
                     await websocket.send_json({
                         "type": "agent_ready",
@@ -368,6 +443,135 @@ async def websocket_endpoint(websocket: WebSocket):
                     await websocket.send_json({
                         "type": "error",
                         "error": f"Agent error: {str(e)}"
+                    })
+
+            elif op == "agent_track_execution":
+                try:
+                    command_id = data.get("command_id")
+                    params = data.get("params", {})
+                    timestamp = data.get("timestamp")
+
+                    if command_id:
+                        command_history.track_execution(
+                            command_id=command_id,
+                            params=params,
+                            timestamp=timestamp,
+                        )
+
+                        if DEBUG_WS:
+                            print(
+                                "[WebSocket] Tracked execution "
+                                f"command_id={command_id} params={params}"
+                            )
+
+                        await websocket.send_json({
+                            "type": "execution_tracked",
+                            "command_id": command_id,
+                        })
+                except Exception as e:
+                    print(f"[WebSocket] Error tracking execution: {e}")
+
+            elif op == "agent_suggest_params":
+                if not agent_service:
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": "Agent service not available",
+                        "request_id": data.get("request_id"),
+                    })
+                    continue
+
+                if not validate_suggestion_request(data):
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": "Invalid suggestion request",
+                        "request_id": data.get("request_id"),
+                    })
+                    continue
+
+                if not rate_limiter.is_allowed():
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": "Too many suggestion requests",
+                        "request_id": data.get("request_id"),
+                    })
+                    continue
+
+                try:
+                    command_id = data.get("command_id")
+                    params = data.get("params", [])
+                    current_params = data.get("current_params", {})
+                    request_id = data.get("request_id")
+
+                    cached = suggestion_cache.get(command_id)
+                    if cached is not None:
+                        if DEBUG_WS:
+                            print(f"[WebSocket] Suggestion cache hit command_id={command_id}")
+                        await websocket.send_json({
+                            "type": "param_suggestions",
+                            "command_id": command_id,
+                            "request_id": request_id,
+                            "suggestions": cached,
+                            "cached": True,
+                        })
+                        continue
+
+                    context = command_history.build_context_string(
+                        command_id=command_id,
+                        limit=10,
+                    )
+
+                    if not current_thread_id:
+                        if not agent_service.assistant_id:
+                            await agent_service.initialize()
+                        thread = await agent_service.create_thread()
+                        current_thread_id = thread.thread_id
+
+                    try:
+                        suggestions = await asyncio.wait_for(
+                            agent_service.suggest_params(
+                                thread_id=current_thread_id,
+                                command_id=command_id,
+                                params=params,
+                                context=context,
+                                current_params=current_params,
+                            ),
+                            timeout=100,
+                        )
+                    except asyncio.TimeoutError:
+                        if DEBUG_WS:
+                            print(
+                                "[WebSocket] Suggestion request timed out "
+                                f"command_id={command_id} request_id={request_id}"
+                            )
+                        await websocket.send_json({
+                            "type": "error",
+                            "error": "Suggestion request timed out",
+                            "request_id": request_id,
+                        })
+                        continue
+
+                    suggestion_cache.set(command_id, suggestions)
+
+                    if DEBUG_WS:
+                        print(
+                            "[WebSocket] Sending suggestions "
+                            f"command_id={command_id} request_id={request_id} "
+                            f"payload={suggestions}"
+                        )
+
+                    await websocket.send_json({
+                        "type": "param_suggestions",
+                        "command_id": command_id,
+                        "request_id": request_id,
+                        "suggestions": suggestions,
+                    })
+
+                except Exception as e:
+                    print(f"[WebSocket] Error generating suggestions: {e}")
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": f"Failed to generate suggestions: {str(e)}",
+                        "request_id": data.get("request_id"),
                     })
             
             # ===== EXISTING MARKET OPERATIONS =====
