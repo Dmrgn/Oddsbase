@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PanelInstance } from "@/hooks/useWorkspaceStore";
 import { useNewsSearch } from "@/hooks/useNewsSearch";
+import { PanelMenu } from "./PanelMenu";
 
 interface NewsFeedPanelProps {
   panel: PanelInstance;
@@ -43,8 +44,18 @@ export function NewsFeedPanel({ panel }: NewsFeedPanelProps) {
   }, [state.status, state.articles.length, submittedQuery]);
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="panel-content min-h-0 flex-1 space-y-4 overflow-y-auto pt-6">
+    <div className="flex h-full flex-col bg-background overflow-hidden relative">
+      {/* Header */}
+      <div className="p-3 border-b shrink-0 z-20 bg-background/95 backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-sm leading-tight truncate">
+            {String(panel.data.title ?? "News Feed")}
+          </h3>
+          <PanelMenu panel={panel} />
+        </div>
+      </div>
+
+      <div className="panel-content min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <form onSubmit={handleSubmit}>
           <label>Search news...</label>
           <input

@@ -148,13 +148,18 @@ export function MarketSearchInput({ isOpen, onOpenChange, onSelect, placeholder 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 p-6" onKeyDown={handleKeyDown}>
-            <div className="w-full max-w-2xl rounded-xl border border-border bg-card shadow-xl overflow-hidden flex flex-col max-h-[80vh]">
+        <div
+            className="fixed inset-0 z-[60] flex items-start justify-center p-6"
+            onKeyDown={handleKeyDown}
+        >
+            <div className="absolute inset-0 bg-black/40" onPointerDown={() => onOpenChange(false)} />
+            <div className="relative z-10 w-full max-w-2xl rounded-xl border border-border bg-card shadow-xl overflow-hidden flex flex-col max-h-[80vh]">
                 <div className="border-b border-border p-4 shrink-0">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             ref={inputRef}
+                            autoFocus
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                             placeholder={placeholder}

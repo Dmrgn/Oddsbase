@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { backendInterface, type OrderBook, type Market, type Outcome } from "@/backendInterface";
-import type { PanelInstance } from "@/hooks/useWorkspaceStore";
+import { useWorkspaceStore, type PanelInstance } from "@/hooks/useWorkspaceStore";
 import { Copy, Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCompactNumber } from "@/lib/utils";
@@ -10,12 +10,14 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PanelMenu } from "./PanelMenu";
 
 interface OrderBookPanelProps {
     panel: PanelInstance;
 }
 
 export function OrderBookPanel({ panel }: OrderBookPanelProps) {
+    const updatePanel = useWorkspaceStore(state => state.updatePanel);
     const marketId = String(panel.data.marketId ?? "");
     const [orderbook, setOrderbook] = useState<OrderBook | null>(null);
     const [market, setMarket] = useState<Market | null>(null);
@@ -43,9 +45,13 @@ export function OrderBookPanel({ panel }: OrderBookPanelProps) {
                 const m = await backendInterface.fetchMarket(marketId);
                 if (isMounted) {
                     setMarket(m);
+                    // Update panel title in store if not set or different
+                    if (panel.data.title !== m.title) {
+                        updatePanel(panel.id, { title: m.title });
+                    }
                     // Auto-select first outcome
                     if (m.outcomes?.length > 0) {
-                        setSelectedOutcome(m.outcomes[0]);
+                        setSelectedOutcome(m.outcomes[0] ?? null);
                     }
                 }
             } catch (err: any) {
@@ -142,14 +148,17 @@ export function OrderBookPanel({ panel }: OrderBookPanelProps) {
                             )}
                         </div>
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 text-muted-foreground hover:text-foreground shrink-0"
-                        onClick={handleCopyMarketId}
-                    >
-                        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                    </Button>
+                    <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                            onClick={handleCopyMarketId}
+                        >
+                            {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                        </Button>
+                        <PanelMenu panel={panel} />
+                    </div>
                 </div>
 
                 {/* Outcome Selector */}
