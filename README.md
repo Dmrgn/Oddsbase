@@ -80,7 +80,7 @@ Our news feed isn't just a simple RSS reader. We pull data from **EXA.ai**, **GD
 
 OddsBase follows a **full-stack TypeScript/Python architecture**:
 
-```
+```md
 ┌─────────────────────────────────────────────────────────────┐
 │                        FRONTEND                             │
 │  React 19 + TypeScript + Zustand + TailwindCSS              │
@@ -113,7 +113,7 @@ The system is built on a high-performance, modern stack. The **FastAPI** backend
 
 ### APIs
 
-To access the data and agents that this project relies on, you will need to create an `env` file and fill it with API keys for the following:
+To access the data and agents that this project relies on, you will need to create a `.env` file and fill it with API keys for the following:
 
 ```env
 # EXA.ai: Agent-based news finder.
@@ -167,3 +167,14 @@ bun dev
 ```
 
 The frontend will be up at `http://localhost:3000`.
+
+### Testing
+
+To run tests:
+
+For the backend, naviggate to  `backend`, ensure the backend is running (at `http://localhost:8000`) as shown earlier, and then run:
+
+```bash
+uv run pytest
+```
+

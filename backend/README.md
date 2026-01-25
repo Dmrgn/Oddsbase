@@ -155,13 +155,10 @@ To show a unified view of "Trump 2024":
 
 ## Testing
 
+Ensure the backend server is running, then:
+
 ```bash
-# Verify WebSocket streaming
-python3 tests/verify_ws.py
-
-# Check markets loaded
-curl http://localhost:8000/markets | python3 -c "import sys, json; print(f'Loaded {len(json.load(sys.stdin))} markets')"
-
-# Run all tests (requires pytest)
-uv run pytest tests/
+uv run pytest
 ```
+
+All tests should pass. The test suite validates health checks, market discovery, orderbook data, and search functionality. Test coverage is pretty high. If you un-suppress the warnings, you'll see backboard-sdk depracation warnings, which can't really be fixed without changing many things since that's a backboard-sdk issue.

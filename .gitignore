@@ -1,7 +1,7 @@
 # macOS system files
 .DS_Store
 
-# Python-generated files
+# Python files
 __pycache__/
 *.py[oc]
 build/
@@ -155,3 +155,5 @@ vite.config.ts.timestamp-*
 .vite/
 
 *ipynb
+out.txt
+test_*.txt

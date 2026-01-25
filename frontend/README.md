@@ -1,6 +1,14 @@
 # OddsBase Frontend
 
-This is the React-based frontend for the OddsBase Prediction Market Dashboard. It features a highly customizable layout, real-time data visualizations, and an integrated AI command palette.
+This is the React-based frontend. Most of the effort for the front end went into creating the (highly) customizable layout, real-time data visualizations, and an integrated AI command palette.
+
+## Stack
+
+- **React 19**: Latest React features for a modern UI.
+- **Tailwind CSS 4**: High-performance, low-runtime styling.
+- **Zustand**: Fast and scalable state management with persistence.
+- **Recharts**: Responsive chart components for market data.
+- **cmdk**: Powering the accessible and extensible command palette.
 
 ## Highlights
 
@@ -39,10 +47,18 @@ bun run build
 bun start
 ```
 
-## Stack
+## Testing
 
-- **React 19**: Latest React features for a modern UI.
-- **Tailwind CSS 4**: High-performance, low-runtime styling.
-- **Zustand**: Fast and scalable state management with persistence.
-- **Recharts**: Responsive chart components for market data.
-- **cmdk**: Powering the accessible and extensible command palette.
+Run the test suite with:
+
+```bash
+bun test
+```
+
+For watch mode during development:
+
+```bash
+bun test:watch
+```
+
+All tests should pass.

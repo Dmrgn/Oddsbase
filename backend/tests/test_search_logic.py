@@ -3,9 +3,10 @@ import json
 from unittest.mock import MagicMock, AsyncMock
 import sys
 import os
+import pytest
 
 # Mock the relative imports
-sys.path.append(os.path.join(os.getcwd(), 'backend'))
+sys.path.append(os.getcwd())
 
 # Create dummy classes for what we need
 class Event:
@@ -20,8 +21,9 @@ sys.modules['..state'] = MagicMock()
 sys.modules['..taxonomy'] = MagicMock()
 
 # Import the stuff to test
-from backend.app.connectors.polymarket import PolymarketConnector, extract_keywords
+from app.connectors.polymarket import PolymarketConnector, extract_keywords
 
+@pytest.mark.asyncio
 async def test_search_logic():
     # Mock Gamma client
     gamma_client = AsyncMock()

@@ -5,3 +5,5 @@ uvicorn
 pydantic-settings
 python-dotenv
 backboard-sdk
+pytest
+pytest-asyncio
